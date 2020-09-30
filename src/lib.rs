@@ -44,10 +44,9 @@
 //!     use gheap::*;
 //!
 //!     // custom heap: ordered by second value (_.1) of the tuples; min first
-//!     let fnComparator = FnComparator(|a: &(i32, i32), b: &(i32, i32)| b.1.cmp(&a.1));
-//!     let mut h: BinaryHeap<(i32, i32), FnComparator<dyn Fn(&(i32, i32),&(i32, i32))>, GHeapDefaultIndexer> = BinaryHeap::from_vec_cmp(
+//!     let mut h = BinaryHeap::from_vec_cmp( 
 //!         vec![(1, 5), (3, 2), (2, 3)],
-//!         fnComparator, // comparator closure here
+//!         |a: &(i32, i32), b: &(i32, i32)| b.1.cmp(&a.1), // comparator closure here
 //!     );
 //!     assert_eq!(h.pop(), Some((3, 2)));
 //! ```
@@ -71,7 +70,7 @@
 //! assert_eq!(heap.pop(), Some(1));
 //!
 //! // custom-sort heap
-//! let mut heap: BinaryHeap<i32, Fn(&i32, &i32)> = BinaryHeap::from_vec_cmp(vec![1,5,3], |a: &i32, b: &i32| b.cmp(a));
+//! let mut heap = BinaryHeap::from_vec_cmp(vec![1,5,3], |a: &i32, b: &i32| b.cmp(a));
 //! assert_eq!(heap.pop(), Some(1));
 //!
 //! // custom-key heap
