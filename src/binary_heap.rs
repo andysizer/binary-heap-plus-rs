@@ -499,7 +499,7 @@ impl<T: fmt::Debug, C: Compare<T>, I: GHeapIndexer> fmt::Debug for BinaryHeap<T,
     }
 }
 
-impl<T, C: Compare<T> + Default, I: GHeapIndexer + Default> BinaryHeap<T, C, I> {
+impl<T, C: Compare<T> + Default> BinaryHeap<T, C, GHeapDefaultIndexer> {
     /// Generic constructor for `BinaryHeap` from `Vec`.
     ///
     /// Because `BinaryHeap` stores the elements in its internal `Vec`,
@@ -509,14 +509,14 @@ impl<T, C: Compare<T> + Default, I: GHeapIndexer + Default> BinaryHeap<T, C, I> 
     }
 }
 
-impl<T, C: Compare<T>, I: GHeapIndexer + Default> BinaryHeap<T, C, I> {
+impl<T, C: Compare<T>> BinaryHeap<T, C, GHeapDefaultIndexer> {
 
     /// Generic constructor for `BinaryHeap` from `Vec` and comparator.
     ///
     /// Because `BinaryHeap` stores the elements in its internal `Vec`,
     /// it's natural to construct it from `Vec`.
     pub fn from_vec_cmp(vec: Vec<T>, cmp: C) -> Self {
-        BinaryHeap::from_vec_cmp_indexer(vec, cmp, I::default())
+        BinaryHeap::from_vec_cmp_indexer(vec, cmp, GHeapDefaultIndexer{})
     }
 }
 
