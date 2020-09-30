@@ -32,7 +32,7 @@
 //!
 //! ```
 //! use std::cmp::Ordering;
-//! use binary_heap_plus::*;
+//! use gheap::*;
 //! use std::usize;
 //!
 //! #[derive(Copy, Clone, Eq, PartialEq)]
@@ -193,7 +193,7 @@ use std::vec;
 /// # Examples
 ///
 /// ```
-/// use binary_heap_plus::*;
+/// use gheap::*;
 ///
 /// // Type inference lets us omit an explicit type signature (which
 /// // would be `BinaryHeap<i32, MaxComparator>` in this example).
@@ -417,20 +417,25 @@ impl GHeapIndexer for GHeapDefaultIndexer {
 /// [`peek_mut`]: struct.BinaryHeap.html#method.peek_mut
 /// [`BinaryHeap`]: struct.BinaryHeap.html
 // #[stable(feature = "binary_heap_peek_mut", since = "1.12.0")]
-pub struct PeekMut<'a, T: 'a, C: 'a + Compare<T>> {
-    heap: &'a mut BinaryHeap<T, C>,
+pub struct PeekMut<'a, T, C, I> 
+where 
+    T: 'a, 
+    C: 'a + Compare<T>, 
+    I: GHeapIndexer 
+{
+    heap: &'a mut BinaryHeap<T, C, I>,
     sift: bool,
 }
 
 // #[stable(feature = "collection_debug", since = "1.17.0")]
-impl<'a, T: fmt::Debug, C: Compare<T>> fmt::Debug for PeekMut<'a, T, C> {
+impl<'a, T: fmt::Debug, C: Compare<T>, I: GHeapIndexer> fmt::Debug for PeekMut<'a, T, C, I> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_tuple("PeekMut").field(&self.heap.data[0]).finish()
     }
 }
 
 // #[stable(feature = "binary_heap_peek_mut", since = "1.12.0")]
-impl<'a, T, C: Compare<T>> Drop for PeekMut<'a, T, C> {
+impl<'a, T, C: Compare<T>, I: GHeapIndexer> Drop for PeekMut<'a, T, C, I> {
     fn drop(&mut self) {
         if self.sift {
             self.heap.sift_down(0);
@@ -439,7 +444,7 @@ impl<'a, T, C: Compare<T>> Drop for PeekMut<'a, T, C> {
 }
 
 // #[stable(feature = "binary_heap_peek_mut", since = "1.12.0")]
-impl<'a, T, C: Compare<T>> Deref for PeekMut<'a, T, C> {
+impl<'a, T, C: Compare<T>, I: GHeapIndexer> Deref for PeekMut<'a, T, C, I> {
     type Target = T;
     fn deref(&self) -> &T {
         &self.heap.data[0]
@@ -447,16 +452,16 @@ impl<'a, T, C: Compare<T>> Deref for PeekMut<'a, T, C> {
 }
 
 // #[stable(feature = "binary_heap_peek_mut", since = "1.12.0")]
-impl<'a, T, C: Compare<T>> DerefMut for PeekMut<'a, T, C> {
+impl<'a, T, C: Compare<T>, I: GHeapIndexer> DerefMut for PeekMut<'a, T, C, I> {
     fn deref_mut(&mut self) -> &mut T {
         &mut self.heap.data[0]
     }
 }
 
-impl<'a, T, C: Compare<T>> PeekMut<'a, T, C> {
+impl<'a, T, C: Compare<T>, I: GHeapIndexer> PeekMut<'a, T, C, I> {
     /// Removes the peeked value from the heap and returns it.
     // #[stable(feature = "binary_heap_peek_mut_pop", since = "1.18.0")]
-    pub fn pop(mut this: PeekMut<'a, T, C>) -> T {
+    pub fn pop(mut this: PeekMut<'a, T, C, I>) -> T {
         let value = this.heap.pop().unwrap();
         this.sift = false;
         value
@@ -488,7 +493,7 @@ impl<T: Ord> Default for BinaryHeap<T> {
 }
 
 // #[stable(feature = "binaryheap_debug", since = "1.4.0")]
-impl<T: fmt::Debug, C: Compare<T>> fmt::Debug for BinaryHeap<T, C> {
+impl<T: fmt::Debug, C: Compare<T>, I: GHeapIndexer> fmt::Debug for BinaryHeap<T, C, I> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_list().entries(self.iter()).finish()
     }
@@ -502,6 +507,9 @@ impl<T, C: Compare<T> + Default, I: GHeapIndexer + Default> BinaryHeap<T, C, I> 
     pub fn from_vec(vec: Vec<T>) -> Self {
         BinaryHeap::from_vec_cmp(vec, C::default())
     }
+}
+
+impl<T, C: Compare<T>, I: GHeapIndexer + Default> BinaryHeap<T, C, I> {
 
     /// Generic constructor for `BinaryHeap` from `Vec` and comparator.
     ///
@@ -510,6 +518,9 @@ impl<T, C: Compare<T> + Default, I: GHeapIndexer + Default> BinaryHeap<T, C, I> 
     pub fn from_vec_cmp(vec: Vec<T>, cmp: C) -> Self {
         BinaryHeap::from_vec_cmp_indexer(vec, cmp, I::default())
     }
+}
+
+impl<T, C: Compare<T> + Default, I: GHeapIndexer> BinaryHeap<T, C, I> {
 
     /// Generic constructor for `BinaryHeap` from `Vec` and indexer.
     ///
@@ -518,6 +529,9 @@ impl<T, C: Compare<T> + Default, I: GHeapIndexer + Default> BinaryHeap<T, C, I> 
     pub fn from_vec_indexer(vec: Vec<T>, indexer: I) -> Self {
         BinaryHeap::from_vec_cmp_indexer(vec, C::default(), indexer)
     }
+}
+
+impl<T, C: Compare<T>, I: GHeapIndexer> BinaryHeap<T, C, I> {
 
     /// Generic constructor for `BinaryHeap` from `Vec`, comparator and indexer.
     ///
@@ -543,7 +557,6 @@ impl<T, C: Compare<T> + Default, I: GHeapIndexer + Default> BinaryHeap<T, C, I> 
     }
 }
 
-
 impl<T: Ord> BinaryHeap<T> {
     
     pub fn new() -> Self {
@@ -566,7 +579,7 @@ impl<T: Ord> BinaryHeap<T, MinComparator> {
     /// Basic usage:
     ///
     /// ```
-    /// use binary_heap_plus::*;
+    /// use gheap::*;
     /// let mut heap = BinaryHeap::new_min();
     /// heap.push(3);
     /// heap.push(1);
@@ -589,7 +602,7 @@ impl<T: Ord> BinaryHeap<T, MinComparator> {
     /// Basic usage:
     ///
     /// ```
-    /// use binary_heap_plus::*;
+    /// use gheap::*;
     /// let mut heap = BinaryHeap::with_capacity_min(10);
     /// assert_eq!(heap.capacity(), 10);
     /// heap.push(3);
@@ -602,7 +615,7 @@ impl<T: Ord> BinaryHeap<T, MinComparator> {
     }
 }
 
-impl<T: Ord, I: GHeapIndexer + std::default::Default> BinaryHeap<T, MinComparator, I> {
+impl<T: Ord, I: GHeapIndexer> BinaryHeap<T, MinComparator, I> {
     /// Creates an empty `BinaryHeap`.
     ///
     /// The `_min_indexer()` version will create a min-heap with a supplied indexer.
@@ -612,7 +625,7 @@ impl<T: Ord, I: GHeapIndexer + std::default::Default> BinaryHeap<T, MinComparato
     /// Basic usage:
     ///
     /// ```
-    /// use binary_heap_plus::*;
+    /// use gheap::*;
     /// let mut heap = BinaryHeap::new_min_indexer(GHeapDefaultIndexer{});
     /// heap.push(3);
     /// heap.push(1);
@@ -635,7 +648,7 @@ impl<T: Ord, I: GHeapIndexer + std::default::Default> BinaryHeap<T, MinComparato
     /// Basic usage:
     ///
     /// ```
-    /// use binary_heap_plus::*;
+    /// use gheap::*;
     /// let mut heap = BinaryHeap::with_capacity_min_indexer(10, GHeapDefaultIndexer{});
     /// assert_eq!(heap.capacity(), 10);
     /// heap.push(3);
@@ -650,7 +663,7 @@ impl<T: Ord, I: GHeapIndexer + std::default::Default> BinaryHeap<T, MinComparato
 
 impl<T, F> BinaryHeap<T, FnComparator<F>>
 where
-    F: Fn(&T, &T) -> Ordering + std::default::Default,
+    F: Fn(&T, &T) -> Ordering,
 {
     /// Creates an empty `BinaryHeap`.
     ///
@@ -661,7 +674,7 @@ where
     /// Basic usage:
     ///
     /// ```
-    /// use binary_heap_plus::*;
+    /// use gheap::*;
     /// let mut heap = BinaryHeap::new_by(|a: &i32, b: &i32| b.cmp(a));
     /// heap.push(3);
     /// heap.push(1);
@@ -684,7 +697,7 @@ where
     /// Basic usage:
     ///
     /// ```
-    /// use binary_heap_plus::*;
+    /// use gheap::*;
     /// let mut heap = BinaryHeap::with_capacity_by(10, |a: &i32, b: &i32| b.cmp(a));
     /// assert_eq!(heap.capacity(), 10);
     /// heap.push(3);
@@ -699,8 +712,8 @@ where
 
 impl<T, F, I> BinaryHeap<T, FnComparator<F>, I>
 where
-    F: Fn(&T, &T) -> Ordering + std::default::Default,
-    I: GHeapIndexer + std::default::Default
+    F: Fn(&T, &T) -> Ordering,
+    I: GHeapIndexer,
 {
     /// Creates an empty `BinaryHeap` that uses the supplied indexer.
     ///
@@ -711,7 +724,7 @@ where
     /// Basic usage:
     ///
     /// ```
-    /// use binary_heap_plus::*;
+    /// use gheap::*;
     /// let mut heap = BinaryHeap::new_by_indexer(|a: &i32, b: &i32| b.cmp(a), GHeapDefaultIndexer{});
     /// heap.push(3);
     /// heap.push(1);
@@ -734,7 +747,7 @@ where
     /// Basic usage:
     ///
     /// ```
-    /// use binary_heap_plus::*;
+    /// use gheap::*;
     /// let mut heap = BinaryHeap::with_capacity_by_indexer(10, |a: &i32, b: &i32| b.cmp(a), GHeapDefaultIndexer{});
     /// assert_eq!(heap.capacity(), 10);
     /// heap.push(3);
@@ -749,7 +762,7 @@ where
 
 impl<T, F, K: Ord> BinaryHeap<T, KeyComparator<F>>
 where
-    F: Fn(&T) -> K + std::default::Default,
+    F: Fn(&T) -> K ,
 {
     /// Creates an empty `BinaryHeap`.
     ///
@@ -760,7 +773,7 @@ where
     /// Basic usage:
     ///
     /// ```
-    /// use binary_heap_plus::*;
+    /// use gheap::*;
     /// let mut heap = BinaryHeap::new_by_key(|a: &i32| a % 4);
     /// heap.push(3);
     /// heap.push(1);
@@ -783,7 +796,7 @@ where
     /// Basic usage:
     ///
     /// ```
-    /// use binary_heap_plus::*;
+    /// use gheap::*;
     /// let mut heap = BinaryHeap::with_capacity_by_key(10, |a: &i32| a % 4);
     /// assert_eq!(heap.capacity(), 10);
     /// heap.push(3);
@@ -798,8 +811,8 @@ where
 
 impl<T, F, K: Ord, I> BinaryHeap<T, KeyComparator<F>, I>
 where
-    F: Fn(&T) -> K + std::default::Default,
-    I: GHeapIndexer + std::default::Default,
+    F: Fn(&T) -> K,
+    I: GHeapIndexer,
 {
     /// Creates an empty `BinaryHeap`.
     ///
@@ -811,7 +824,7 @@ where
     /// Basic usage:
     ///
     /// ```
-    /// use binary_heap_plus::*;
+    /// use gheap::*;
     /// let mut heap = BinaryHeap::new_by_key_indexer(|a: &i32| a % 4, GHeapDefaultIndexer{});
     /// heap.push(3);
     /// heap.push(1);
@@ -835,7 +848,7 @@ where
     /// Basic usage:
     ///
     /// ```
-    /// use binary_heap_plus::*;
+    /// use gheap::*;
     /// let mut heap = BinaryHeap::with_capacity_by_key_indexer(10, |a: &i32| a % 4, GHeapDefaultIndexer{});
     /// assert_eq!(heap.capacity(), 10);
     /// heap.push(3);
@@ -848,7 +861,7 @@ where
     }
 }
 
-impl<T, C: Compare<T>> BinaryHeap<T, C> {
+impl<T, C: Compare<T>, I: GHeapIndexer> BinaryHeap<T, C, I> {
     /// Replaces the comparator of binary heap.
     ///
     /// # Examples
@@ -856,10 +869,11 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// Basic usage:
     ///
     /// ```
-    /// use binary_heap_plus::*;
+    /// use gheap::*;
     /// use compare::Compare;
     /// use std::cmp::Ordering;
     ///
+    /// #[derive(Default)]
     /// struct Comparator {
     ///     ascending: bool
     /// }
@@ -875,7 +889,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// }
     ///
     /// // construct a heap in ascending order.
-    /// let mut heap = BinaryHeap::from_vec_cmp(vec![3, 1, 5], Comparator { ascending: true });
+    /// let mut heap: BinaryHeap<i32, Comparator> = BinaryHeap::from_vec_cmp(vec![3, 1, 5], Comparator { ascending: true });
     ///
     /// // replace the comparor
     /// heap.replace_cmp(Comparator { ascending: false });
@@ -907,7 +921,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// Basic usage:
     ///
     /// ```
-    /// use binary_heap_plus::*;
+    /// use gheap::*;
     /// let heap = BinaryHeap::from(vec![1, 2, 3, 4]);
     ///
     /// // Print 1, 2, 3, 4 in arbitrary order
@@ -930,13 +944,13 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// Basic usage:
     ///
     /// ```
-    /// use binary_heap_plus::*;
+    /// use gheap::*;
     /// let heap = BinaryHeap::from(vec![1, 2, 3, 4, 5]);
     ///
     /// assert_eq!(heap.into_iter_sorted().take(2).collect::<Vec<_>>(), vec![5, 4]);
     /// ```
     // #[unstable(feature = "binary_heap_into_iter_sorted", issue = "59278")]
-    pub fn into_iter_sorted(self) -> IntoIterSorted<T, C> {
+    pub fn into_iter_sorted(self) -> IntoIterSorted<T, C, I> {
         IntoIterSorted { inner: self }
     }
 
@@ -947,7 +961,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// Basic usage:
     ///
     /// ```
-    /// use binary_heap_plus::*;
+    /// use gheap::*;
     /// let mut heap = BinaryHeap::new();
     /// assert_eq!(heap.peek(), None);
     ///
@@ -973,7 +987,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// Basic usage:
     ///
     /// ```
-    /// use binary_heap_plus::*;
+    /// use gheap::*;
     /// let mut heap = BinaryHeap::new();
     /// assert!(heap.peek_mut().is_none());
     ///
@@ -987,7 +1001,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// assert_eq!(heap.peek(), Some(&2));
     /// ```
     // #[stable(feature = "binary_heap_peek_mut", since = "1.12.0")]
-    pub fn peek_mut(&mut self) -> Option<PeekMut<T, C>> {
+    pub fn peek_mut(&mut self) -> Option<PeekMut<T, C, I>> {
         if self.is_empty() {
             None
         } else {
@@ -1005,7 +1019,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// Basic usage:
     ///
     /// ```
-    /// use binary_heap_plus::*;
+    /// use gheap::*;
     /// let mut heap = BinaryHeap::with_capacity(100);
     /// assert!(heap.capacity() >= 100);
     /// heap.push(4);
@@ -1031,7 +1045,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// Basic usage:
     ///
     /// ```
-    /// use binary_heap_plus::*;
+    /// use gheap::*;
     /// let mut heap = BinaryHeap::new();
     /// heap.reserve_exact(100);
     /// assert!(heap.capacity() >= 100);
@@ -1056,7 +1070,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// Basic usage:
     ///
     /// ```
-    /// use binary_heap_plus::*;
+    /// use gheap::*;
     /// let mut heap = BinaryHeap::new();
     /// heap.reserve(100);
     /// assert!(heap.capacity() >= 100);
@@ -1074,7 +1088,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// Basic usage:
     ///
     /// ```
-    /// use binary_heap_plus::*;
+    /// use gheap::*;
     /// let mut heap: BinaryHeap<i32> = BinaryHeap::with_capacity(100);
     ///
     /// assert!(heap.capacity() >= 100);
@@ -1094,7 +1108,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// Basic usage:
     ///
     /// ```
-    /// use binary_heap_plus::*;
+    /// use gheap::*;
     /// let mut heap = BinaryHeap::from(vec![1, 3]);
     ///
     /// assert_eq!(heap.pop(), Some(3));
@@ -1119,7 +1133,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// Basic usage:
     ///
     /// ```
-    /// use binary_heap_plus::*;
+    /// use gheap::*;
     /// let mut heap = BinaryHeap::new();
     /// heap.push(3);
     /// heap.push(5);
@@ -1143,7 +1157,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// Basic usage:
     ///
     /// ```
-    /// use binary_heap_plus::*;
+    /// use gheap::*;
     /// let heap = BinaryHeap::from(vec![1, 2, 3, 4, 5, 6, 7]);
     /// let vec = heap.into_vec();
     ///
@@ -1165,7 +1179,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// Basic usage:
     ///
     /// ```
-    /// use binary_heap_plus::*;
+    /// use gheap::*;
     ///
     /// let mut heap = BinaryHeap::from(vec![1, 2, 4, 5, 7]);
     /// heap.push(6);
@@ -1187,22 +1201,23 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     }
 
     // The implementations of sift_up and sift_down use unsafe blocks in
-    // order to move an element out of the vector (leaving behind a
-    // hole), shift along the others and move the removed element back into the
+    // order to move an element out of the vector leaving behind a
+    // hole. This hole is then filled with the replacement element
+    // leaving creatng a hole. Finally the initial element is movde back into the
     // vector at the final location of the hole.
     // The `Hole` type is used to represent this, and make sure
-    // the hole is filled back at the end of its scope, even on panic.
+    // the hole is filled back at the end of its scope (via Drop), even on panic.
     // Using a hole reduces the constant factor compared to using swaps,
     // which involves twice as many moves.
     fn sift_up(&mut self, start: usize, pos: usize) -> usize {
         unsafe {
             // Take out the value at `pos` and create a hole.
-            let mut hole = Hole::new(&mut self.data, pos);
+            let mut hole = Hole::new(&mut self.data, pos, &self.cmp);
 
             while hole.pos() > start {
-                let parent = (hole.pos() - 1) / 2;
+                let parent: usize = self.indexer.get_parent_index(hole.pos());
                 // if hole.element() <= hole.get(parent) {
-                if self.cmp.compare(hole.element(), hole.get(parent)) != Ordering::Greater {
+                if self.cmp.compare(hole.element(), hole.get(parent)) == Ordering::Less {
                     break;
                 }
                 hole.move_to(parent);
@@ -1214,27 +1229,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// Take an element at `pos` and move it down the heap,
     /// while its children are larger.
     fn sift_down_range(&mut self, pos: usize, end: usize) {
-        unsafe {
-            let mut hole = Hole::new(&mut self.data, pos);
-            let mut child = 2 * pos + 1;
-            while child < end {
-                let right = child + 1;
-                // compare with the greater of the two children
-                // if right < end && !(hole.get(child) > hole.get(right)) {
-                if right < end
-                    && self.cmp.compare(hole.get(child), hole.get(right)) != Ordering::Greater
-                {
-                    child = right;
-                }
-                // if we are already in order, stop.
-                // if hole.element() >= hole.get(child) {
-                if self.cmp.compare(hole.element(), hole.get(child)) != Ordering::Less {
-                    break;
-                }
-                hole.move_to(child);
-                child = 2 * hole.pos() + 1;
-            }
-        }
+        self.sift_down_to_bottom_impl(pos, end);
     }
 
     fn sift_down(&mut self, pos: usize) {
@@ -1242,33 +1237,44 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
         self.sift_down_range(pos, len);
     }
 
-    /// Take an element at `pos` and move it all the way down the heap,
+        /// Take an element at `pos` and move it all the way down the heap,
     /// then sift it up to its position.
     ///
     /// Note: This is faster when the element is known to be large / should
     /// be closer to the bottom.
-    fn sift_down_to_bottom(&mut self, mut pos: usize) {
-        let end = self.len();
+    fn sift_down_to_bottom(&mut self, pos: usize) {
+        self.sift_down_to_bottom_impl(pos, self.len());
+    }
+
+    #[inline(always)]
+    fn sift_down_to_bottom_impl(&mut self, mut pos: usize, end: usize) {
+        debug_assert!(pos < end);
         let start = pos;
+
+        let fanout = self.indexer.get_fanout();
+        let last_full_index = end - ((end - 1) % fanout);
+
         unsafe {
-            let mut hole = Hole::new(&mut self.data, pos);
-            let mut child = 2 * pos + 1;
-            while child < end {
-                let right = child + 1;
-                // compare with the greater of the two children
-                // if right < end && !(hole.get(child) > hole.get(right)) {
-                if right < end
-                    && self.cmp.compare(hole.get(child), hole.get(right)) != Ordering::Greater
-                {
-                    child = right;
+            let mut hole = Hole::new(&mut self.data, pos, &self.cmp);
+            loop {
+                let child = self.indexer.get_child_index(hole.pos);
+                if child >= last_full_index {
+                    if child < end {
+                        assert!(child == last_full_index);
+                        let max_child = hole.get_max_child(child, end);
+                        hole.move_to(max_child);              
+                    }
+                    break;
+                } else{
+                    let max_child = hole.get_max_child(child, child + fanout);
+                    hole.move_to(max_child);
                 }
-                hole.move_to(child);
-                child = 2 * hole.pos() + 1;
             }
             pos = hole.pos;
         }
         self.sift_up(start, pos);
     }
+
 
     /// Returns the length of the binary heap.
     ///
@@ -1277,7 +1283,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// Basic usage:
     ///
     /// ```
-    /// use binary_heap_plus::*;
+    /// use gheap::*;
     /// let heap = BinaryHeap::from(vec![1, 3]);
     ///
     /// assert_eq!(heap.len(), 2);
@@ -1294,7 +1300,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// Basic usage:
     ///
     /// ```
-    /// use binary_heap_plus::*;
+    /// use gheap::*;
     /// let mut heap = BinaryHeap::new();
     ///
     /// assert!(heap.is_empty());
@@ -1319,7 +1325,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// Basic usage:
     ///
     /// ```
-    /// use binary_heap_plus::*;
+    /// use gheap::*;
     /// let mut heap = BinaryHeap::from(vec![1, 3]);
     ///
     /// assert!(!heap.is_empty());
@@ -1345,7 +1351,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// Basic usage:
     ///
     /// ```
-    /// use binary_heap_plus::*;
+    /// use gheap::*;
     /// let mut heap = BinaryHeap::from(vec![1, 3]);
     ///
     /// assert!(!heap.is_empty());
@@ -1374,7 +1380,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// Basic usage:
     ///
     /// ```
-    /// use binary_heap_plus::*;
+    /// use gheap::*;
     ///
     /// let v = vec![-10, 1, 2, 3, 3];
     /// let mut a = BinaryHeap::from(v);
@@ -1421,29 +1427,37 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     }
 }
 
+impl<T, C: Compare<T> + Default, I: GHeapIndexer + Default> BinaryHeap<T, C, I> {
+}
+
 /// Hole represents a hole in a slice i.e. an index without valid value
 /// (because it was moved from or duplicated).
 /// In drop, `Hole` will restore the slice by filling the hole
 /// position with the value that was originally removed.
-struct Hole<'a, T: 'a> {
+struct Hole<'a, T: 'a, C = MaxComparator> 
+where
+    C: Compare<T>
+{
     data: &'a mut [T],
     /// `elt` is always `Some` from new until drop.
     elt: Option<T>,
     pos: usize,
+    cmp: &'a C,
 }
 
-impl<'a, T> Hole<'a, T> {
+impl<'a, T, C: Compare<T>> Hole<'a, T, C> {
     /// Create a new Hole at index `pos`.
     ///
     /// Unsafe because pos must be within the data slice.
     #[inline]
-    unsafe fn new(data: &'a mut [T], pos: usize) -> Self {
+    unsafe fn new(data: &'a mut [T], pos: usize, cmp: &'a C) -> Self {
         debug_assert!(pos < data.len());
         let elt = ptr::read(&data[pos]);
         Hole {
             data,
             elt: Some(elt),
             pos,
+            cmp,
         }
     }
 
@@ -1480,9 +1494,27 @@ impl<'a, T> Hole<'a, T> {
         ptr::copy_nonoverlapping(index_ptr, hole_ptr, 1);
         self.pos = index;
     }
+
+    /// find index of max value between start and end. Used to find max_child when sifting down.
+    /// Implement via Hole to avoid borrowing the GHeap in callers.
+    /// 
+    /// unsafe because start and end must be within data slice and not equal to pos
+    // TODO: rename??
+    #[inline(always)]
+    unsafe fn get_max_child(&self, start: usize, end: usize) -> usize {
+        let mut max= start;
+        for i in start + 1 .. end {
+            if self.cmp.compare(self.get(i), self.get(max)) == Ordering::Greater
+            {
+                max = i;
+            }
+        }
+        max
+    }
+
 }
 
-impl<'a, T> Drop for Hole<'a, T> {
+impl<'a, T, C: Compare<T>> Drop for Hole<'a, T, C> {
     #[inline]
     fn drop(&mut self) {
         // fill the hole again
@@ -1612,12 +1644,12 @@ impl<T> DoubleEndedIterator for IntoIter<T> {
 
 // #[unstable(feature = "binary_heap_into_iter_sorted", issue = "59278")]
 #[derive(Clone, Debug)]
-pub struct IntoIterSorted<T, C: Compare<T>> {
-    inner: BinaryHeap<T, C>,
+pub struct IntoIterSorted<T, C: Compare<T>, I: GHeapIndexer> {
+    inner: BinaryHeap<T, C, I>,
 }
 
 // #[unstable(feature = "binary_heap_into_iter_sorted", issue = "59278")]
-impl<T, C: Compare<T>> Iterator for IntoIterSorted<T, C> {
+impl<T, C: Compare<T>, I: GHeapIndexer> Iterator for IntoIterSorted<T, C, I> {
     type Item = T;
 
     #[inline]
@@ -1693,7 +1725,7 @@ impl<T: Ord> From<Vec<T>> for BinaryHeap<T> {
 //     }
 // }
 
-impl<T, C: Compare<T>> Into<Vec<T>> for BinaryHeap<T, C> {
+impl<T, C: Compare<T>, I: GHeapIndexer> Into<Vec<T>> for BinaryHeap<T, C, I> {
     fn into(self) -> Vec<T> {
         self.data
     }
@@ -1720,7 +1752,7 @@ impl<T, C: Compare<T>> IntoIterator for BinaryHeap<T, C> {
     /// Basic usage:
     ///
     /// ```
-    /// use binary_heap_plus::*;
+    /// use gheap::*;
     /// let heap = BinaryHeap::from(vec![1, 2, 3, 4]);
     ///
     /// // Print 1, 2, 3, 4 in arbitrary order
@@ -1747,7 +1779,7 @@ impl<'a, T, C: Compare<T>> IntoIterator for &'a BinaryHeap<T, C> {
 }
 
 // #[stable(feature = "rust1", since = "1.0.0")]
-impl<T, C: Compare<T>> Extend<T> for BinaryHeap<T, C> {
+impl<T, C: Compare<T>, G: GHeapIndexer> Extend<T> for BinaryHeap<T, C, G> {
     #[inline]
     fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
         // <Self as SpecExtend<I>>::spec_extend(self, iter);
@@ -1767,7 +1799,7 @@ impl<T, C: Compare<T>> Extend<T> for BinaryHeap<T, C> {
 //     }
 // }
 
-impl<T, C: Compare<T>> BinaryHeap<T, C> {
+impl<T, C: Compare<T>, G: GHeapIndexer> BinaryHeap<T, C, G> {
     fn extend_desugared<I: IntoIterator<Item = T>>(&mut self, iter: I) {
         let iterator = iter.into_iter();
         let (lower, _) = iterator.size_hint();
@@ -1781,7 +1813,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
 }
 
 // #[stable(feature = "extend_ref", since = "1.2.0")]
-impl<'a, T: 'a + Copy, C: Compare<T>> Extend<&'a T> for BinaryHeap<T, C> {
+impl<'a, T: 'a + Copy, C: Compare<T>, G: GHeapIndexer> Extend<&'a T> for BinaryHeap<T, C, G> {
     fn extend<I: IntoIterator<Item = &'a T>>(&mut self, iter: I) {
         self.extend(iter.into_iter().cloned());
     }
