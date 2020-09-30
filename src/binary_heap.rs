@@ -232,14 +232,17 @@ use std::vec;
 /// // The heap should now be empty.
 /// assert!(heap.is_empty())
 /// ```
+
 // #[stable(feature = "rust1", since = "1.0.0")]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct BinaryHeap<T, C = MaxComparator>
+pub struct BinaryHeap<T, C = MaxComparator, I = GHeapDefaultIndexer>
 where
     C: Compare<T>,
+    I: GHeapIndexer,
 {
     data: Vec<T>,
     cmp: C,
+    indexer: I,
 }
 
 /// For `T` that implements `Ord`, you can use this struct to quickly
@@ -292,6 +295,117 @@ where
     fn compare(&self, a: &T, b: &T) -> Ordering {
         self.0(a).cmp(&self.0(b))
     }
+}
+
+pub trait GHeapIndexer {
+    fn get_fanout(&self) -> usize;
+
+    fn get_page_chunks(&self) -> usize;
+
+    #[inline(always)]
+    fn get_page_chunks_max(&self) -> usize {
+        usize::MAX / self.get_fanout()
+    }
+
+    #[inline(always)]
+    fn get_page_size(&self) -> usize {
+        self.get_fanout() * self.get_page_chunks()
+    }
+
+    #[inline(always)]
+    fn get_page_leaves(&self) -> usize {
+        ((self.get_fanout() - 1) * self.get_page_chunks()) + 1
+    }
+
+    #[inline(always)]
+    fn get_parent_index(&self, u: usize) -> usize {
+        assert!(u > 0);
+
+        let fanout = self.get_fanout();
+        let page_chunks = self.get_page_chunks();
+        let u = u - 1;
+        if page_chunks == 1 {
+            u / fanout
+        } else if u < fanout {
+            // Parent is root
+            0
+        } else {
+            assert!(page_chunks <= self.get_page_chunks_max());
+            let page_size = self.get_page_size();
+            let v = u % page_size;
+            if v >= fanout {
+                // Fast path. Parent is on same page as the child
+                (u - v) + (v / fanout)
+            } else {
+                // Slow path. Parent is on another page.
+                let page_leaves = self.get_page_leaves();
+                let v = (u / page_size) - 1;
+                let u = (v / page_leaves) + 1;
+                (u * page_size) + (v % page_leaves) - page_leaves + 1
+            }
+        }
+    }
+
+    #[inline(always)]
+    fn get_child_index(&self, u: usize) -> usize {
+        assert!(u < usize::MAX);
+
+        let fanout = self.get_fanout();
+        let page_chunks = self.get_page_chunks();
+        if page_chunks == 1 {
+            if u > ((usize::MAX  - 1) / fanout) {
+                // Child overflow
+                // It's reasonable to return usize::MAX  here, since OOM will have occured already.
+                usize::MAX 
+            } else {
+                (u * fanout) + 1
+            }
+        } else if u == 0 {
+            // Root's child is always 1
+            1
+        } else {
+            assert!(page_chunks <= self.get_page_chunks_max());
+            let u = u - 1;
+            let page_size = self.get_page_size();
+            let v = (u % page_size) + 1;
+            if v < page_chunks {
+                // Fast path. Child is on same page as parent
+                let v = v * (fanout -1);
+                // help the constant folder a bit
+                let max_less_2 = usize::MAX - 2;
+                let lim = max_less_2 - v;
+                if u > lim {
+                    // Child overflow.
+                    // It's reasonable to return usize::MAX here, since OOM will have occured already.
+                    usize::MAX
+                } else {
+                    u + v + 2
+                }
+            } else {
+                // Slow path. Child is on another page.
+                let page_num = (u / page_size) + 1;
+                let leaf_id = page_num * self.get_page_leaves();
+                let v = v + leaf_id - page_size;
+                if v > ((usize::MAX - 1) / page_size) {
+                    usize::MAX
+                } else {
+                    (v * page_size) + 1
+                }
+            }
+        }
+    }
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Clone, Copy, Default, Debug)]
+pub struct GHeapDefaultIndexer {}
+        
+impl GHeapIndexer for GHeapDefaultIndexer {
+    #[inline(always)] 
+    fn get_fanout(&self) -> usize { 4 } 
+
+    #[inline(always)] 
+    fn get_page_chunks(&self) -> usize { 2 }
 }
 
 /// Structure wrapping a mutable reference to the greatest item on a
@@ -350,11 +464,12 @@ impl<'a, T, C: Compare<T>> PeekMut<'a, T, C> {
 }
 
 // #[stable(feature = "rust1", since = "1.0.0")]
-impl<T: Clone, C: Compare<T> + Clone> Clone for BinaryHeap<T, C> {
+impl<T: Clone, C: Compare<T> + Clone, I: GHeapIndexer + Clone> Clone for BinaryHeap<T, C, I> {
     fn clone(&self) -> Self {
         BinaryHeap {
             data: self.data.clone(),
             cmp: self.cmp.clone(),
+            indexer: self.indexer.clone()
         }
     }
 
@@ -379,7 +494,7 @@ impl<T: fmt::Debug, C: Compare<T>> fmt::Debug for BinaryHeap<T, C> {
     }
 }
 
-impl<T, C: Compare<T> + Default> BinaryHeap<T, C> {
+impl<T, C: Compare<T> + Default, I: GHeapIndexer + Default> BinaryHeap<T, C, I> {
     /// Generic constructor for `BinaryHeap` from `Vec`.
     ///
     /// Because `BinaryHeap` stores the elements in its internal `Vec`,
@@ -387,15 +502,29 @@ impl<T, C: Compare<T> + Default> BinaryHeap<T, C> {
     pub fn from_vec(vec: Vec<T>) -> Self {
         BinaryHeap::from_vec_cmp(vec, C::default())
     }
-}
 
-impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// Generic constructor for `BinaryHeap` from `Vec` and comparator.
     ///
     /// Because `BinaryHeap` stores the elements in its internal `Vec`,
     /// it's natural to construct it from `Vec`.
     pub fn from_vec_cmp(vec: Vec<T>, cmp: C) -> Self {
-        unsafe { BinaryHeap::from_vec_cmp_raw(vec, cmp, true) }
+        BinaryHeap::from_vec_cmp_indexer(vec, cmp, I::default())
+    }
+
+    /// Generic constructor for `BinaryHeap` from `Vec` and indexer.
+    ///
+    /// Because `BinaryHeap` stores the elements in its internal `Vec`,
+    /// it's natural to construct it from `Vec`.
+    pub fn from_vec_indexer(vec: Vec<T>, indexer: I) -> Self {
+        BinaryHeap::from_vec_cmp_indexer(vec, C::default(), indexer)
+    }
+
+    /// Generic constructor for `BinaryHeap` from `Vec`, comparator and indexer.
+    ///
+    /// Because `BinaryHeap` stores the elements in its internal `Vec`,
+    /// it's natural to construct it from `Vec`.
+    pub fn from_vec_cmp_indexer(vec: Vec<T>, cmp: C, indexer: I) -> Self {
+        unsafe { BinaryHeap::from_vec_cmp_indexer_raw(vec, cmp, indexer, true) }
     }
 
     /// Generic constructor for `BinaryHeap` from `Vec` and comparator.
@@ -405,8 +534,8 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     ///
     /// # Safety
     /// User is responsible for providing valid `rebuild` value.
-    pub unsafe fn from_vec_cmp_raw(vec: Vec<T>, cmp: C, rebuild: bool) -> Self {
-        let mut heap = BinaryHeap { data: vec, cmp };
+    pub unsafe fn from_vec_cmp_indexer_raw(vec: Vec<T>, cmp: C, indexer: I, rebuild: bool) -> Self {
+        let mut heap = BinaryHeap { data: vec, cmp, indexer};
         if rebuild && !heap.data.is_empty() {
             heap.rebuild();
         }
@@ -414,49 +543,14 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     }
 }
 
+
 impl<T: Ord> BinaryHeap<T> {
-    /// Creates an empty `BinaryHeap`.
-    ///
-    /// This default version will create a max-heap.
-    ///
-    /// # Examples
-    ///
-    /// Basic usage:
-    ///
-    /// ```
-    /// use binary_heap_plus::*;
-    /// let mut heap = BinaryHeap::new();
-    /// heap.push(3);
-    /// heap.push(1);
-    /// heap.push(5);
-    /// assert_eq!(heap.pop(), Some(5));
-    /// ```
-    // #[stable(feature = "rust1", since = "1.0.0")]
+    
     pub fn new() -> Self {
         BinaryHeap::from_vec(vec![])
     }
 
-    /// Creates an empty `BinaryHeap` with a specific capacity.
-    /// This preallocates enough memory for `capacity` elements,
-    /// so that the `BinaryHeap` does not have to be reallocated
-    /// until it contains at least that many values.
-    ///
-    /// This default version will create a max-heap.
-    ///
-    /// # Examples
-    ///
-    /// Basic usage:
-    ///
-    /// ```
-    /// use binary_heap_plus::*;
-    /// let mut heap = BinaryHeap::with_capacity(10);
-    /// assert_eq!(heap.capacity(), 10);
-    /// heap.push(3);
-    /// heap.push(1);
-    /// heap.push(5);
-    /// assert_eq!(heap.pop(), Some(5));
-    /// ```
-    // #[stable(feature = "rust1", since = "1.0.0")]
+    
     pub fn with_capacity(capacity: usize) -> Self {
         BinaryHeap::from_vec(Vec::with_capacity(capacity))
     }
@@ -508,9 +602,55 @@ impl<T: Ord> BinaryHeap<T, MinComparator> {
     }
 }
 
+impl<T: Ord, I: GHeapIndexer + std::default::Default> BinaryHeap<T, MinComparator, I> {
+    /// Creates an empty `BinaryHeap`.
+    ///
+    /// The `_min_indexer()` version will create a min-heap with a supplied indexer.
+    ///
+    /// # Examples
+    ///
+    /// Basic usage:
+    ///
+    /// ```
+    /// use binary_heap_plus::*;
+    /// let mut heap = BinaryHeap::new_min_indexer(GHeapDefaultIndexer{});
+    /// heap.push(3);
+    /// heap.push(1);
+    /// heap.push(5);
+    /// assert_eq!(heap.pop(), Some(1));
+    /// ```
+    pub fn new_min_indexer(indexer: I) -> Self {
+        BinaryHeap::from_vec_indexer(vec![], indexer)
+    }
+
+    /// Creates an empty `BinaryHeap` with a specific capacity and a supplied indexer.
+    /// This preallocates enough memory for `capacity` elements,
+    /// so that the `BinaryHeap` does not have to be reallocated
+    /// until it contains at least that many values.
+    ///
+    /// The `_min_indexer()` version will create a min-heap with the supplied indexer.
+    ///
+    /// # Examples
+    ///
+    /// Basic usage:
+    ///
+    /// ```
+    /// use binary_heap_plus::*;
+    /// let mut heap = BinaryHeap::with_capacity_min_indexer(10, GHeapDefaultIndexer{});
+    /// assert_eq!(heap.capacity(), 10);
+    /// heap.push(3);
+    /// heap.push(1);
+    /// heap.push(5);
+    /// assert_eq!(heap.pop(), Some(1));
+    /// ```
+    pub fn with_capacity_min_indexer(capacity: usize, indexer :I) -> Self {
+        BinaryHeap::from_vec_indexer(Vec::with_capacity(capacity), indexer)
+    }
+}
+
 impl<T, F> BinaryHeap<T, FnComparator<F>>
 where
-    F: Fn(&T, &T) -> Ordering,
+    F: Fn(&T, &T) -> Ordering + std::default::Default,
 {
     /// Creates an empty `BinaryHeap`.
     ///
@@ -557,9 +697,59 @@ where
     }
 }
 
+impl<T, F, I> BinaryHeap<T, FnComparator<F>, I>
+where
+    F: Fn(&T, &T) -> Ordering + std::default::Default,
+    I: GHeapIndexer + std::default::Default
+{
+    /// Creates an empty `BinaryHeap` that uses the supplied indexer.
+    ///
+    /// The `_by_indexer()` version will create a heap ordered by given closure using the supplied indexer.
+    ///
+    /// # Examples
+    ///
+    /// Basic usage:
+    ///
+    /// ```
+    /// use binary_heap_plus::*;
+    /// let mut heap = BinaryHeap::new_by_indexer(|a: &i32, b: &i32| b.cmp(a), GHeapDefaultIndexer{});
+    /// heap.push(3);
+    /// heap.push(1);
+    /// heap.push(5);
+    /// assert_eq!(heap.pop(), Some(1));
+    /// ```
+    pub fn new_by_indexer(f: F, indexer: I) -> Self {
+        BinaryHeap::from_vec_cmp_indexer(vec![], FnComparator(f), indexer)
+    }
+
+    /// Creates an empty `BinaryHeap` with a specific capacity that uses the supplied indexer.
+    /// This preallocates enough memory for `capacity` elements,
+    /// so that the `BinaryHeap` does not have to be reallocated
+    /// until it contains at least that many values.
+    ///
+    /// The `_by_indexer()` version will create a heap that uses the supplied indexer ordered by given closure.
+    ///
+    /// # Examples
+    ///
+    /// Basic usage:
+    ///
+    /// ```
+    /// use binary_heap_plus::*;
+    /// let mut heap = BinaryHeap::with_capacity_by_indexer(10, |a: &i32, b: &i32| b.cmp(a), GHeapDefaultIndexer{});
+    /// assert_eq!(heap.capacity(), 10);
+    /// heap.push(3);
+    /// heap.push(1);
+    /// heap.push(5);
+    /// assert_eq!(heap.pop(), Some(1));
+    /// ```
+    pub fn with_capacity_by_indexer(capacity: usize, f: F, indexer: I) -> Self {
+        BinaryHeap::from_vec_cmp_indexer(Vec::with_capacity(capacity), FnComparator(f), indexer)
+    }
+}
+
 impl<T, F, K: Ord> BinaryHeap<T, KeyComparator<F>>
 where
-    F: Fn(&T) -> K,
+    F: Fn(&T) -> K + std::default::Default,
 {
     /// Creates an empty `BinaryHeap`.
     ///
@@ -603,6 +793,58 @@ where
     /// ```
     pub fn with_capacity_by_key(capacity: usize, f: F) -> Self {
         BinaryHeap::from_vec_cmp(Vec::with_capacity(capacity), KeyComparator(f))
+    }
+}
+
+impl<T, F, K: Ord, I> BinaryHeap<T, KeyComparator<F>, I>
+where
+    F: Fn(&T) -> K + std::default::Default,
+    I: GHeapIndexer + std::default::Default,
+{
+    /// Creates an empty `BinaryHeap`.
+    ///
+    /// The `_by_key_indexer()` version will create a heap ordered by key converted by given closure
+    /// and that uses the supplied indexer.
+    ///
+    /// # Examples
+    ///
+    /// Basic usage:
+    ///
+    /// ```
+    /// use binary_heap_plus::*;
+    /// let mut heap = BinaryHeap::new_by_key_indexer(|a: &i32| a % 4, GHeapDefaultIndexer{});
+    /// heap.push(3);
+    /// heap.push(1);
+    /// heap.push(5);
+    /// assert_eq!(heap.pop(), Some(3));
+    /// ```
+    pub fn new_by_key_indexer(f: F, indexer: I) -> Self {
+        BinaryHeap::from_vec_cmp_indexer(vec![], KeyComparator(f), indexer)
+    }
+
+    /// Creates an empty `BinaryHeap` with a specific capacity that uses the supplied indexer.
+    /// This preallocates enough memory for `capacity` elements,
+    /// so that the `BinaryHeap` does not have to be reallocated
+    /// until it contains at least that many values.
+    ///
+    /// The `_by_key_indexer()` version will create a heap ordered by key coverted by given closure
+    /// and that uses the supplied indexer.
+    ///
+    /// # Examples
+    ///
+    /// Basic usage:
+    ///
+    /// ```
+    /// use binary_heap_plus::*;
+    /// let mut heap = BinaryHeap::with_capacity_by_key_indexer(10, |a: &i32| a % 4, GHeapDefaultIndexer{});
+    /// assert_eq!(heap.capacity(), 10);
+    /// heap.push(3);
+    /// heap.push(1);
+    /// heap.push(5);
+    /// assert_eq!(heap.pop(), Some(3));
+    /// ```
+    pub fn with_capacity_by_key_indexer(capacity: usize, f: F, indexer: I) -> Self {
+        BinaryHeap::from_vec_cmp_indexer(Vec::with_capacity(capacity), KeyComparator(f), indexer)
     }
 }
 
@@ -931,6 +1173,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     ///
     /// let vec = heap.into_sorted_vec();
     /// assert_eq!(vec, [1, 2, 3, 4, 5, 6, 7]);
+    // !@! Really? Not if its a Max heap surely? And if so this needs to be reimplemented
     /// ```
     // #[stable(feature = "binary_heap_extras_15", since = "1.5.0")]
     pub fn into_sorted_vec(mut self) -> Vec<T> {
