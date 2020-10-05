@@ -417,9 +417,19 @@ macro_rules! def_indexer {
     };
 }
 
-// The default indexer for GHeap has a fanout of 4 and uses 2 page chunks.
-def_indexer!(DefaultIndexer, 4, 2);
+/// The default indexer for GHeap has a fanout of 4 and uses 2 page chunks.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Clone, Copy, Default, Debug)]
+pub struct DefaultIndexer {}
+        
+impl Indexer for DefaultIndexer {
+    #[inline(always)] 
+    fn get_fanout(&self) -> usize { 4 } 
 
+    #[inline(always)] 
+    fn get_page_chunks(&self) -> usize { 2 } 
+
+}
 /// Structure wrapping a mutable reference to the greatest item on a
 /// `GHeap`.
 ///
