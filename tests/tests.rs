@@ -1,7 +1,12 @@
 
 
 
-#[macro_use] use gheap::*;
+use gheap::*;
+
+use rand::thread_rng;
+use rand::distributions::{Distribution, Uniform};
+
+#[cfg(test)]
 
 fn passed() {
     println!(" OK");
@@ -33,12 +38,13 @@ fn test_parent_child<I: Indexer>(idxer: &I, start_index: usize, n: usize) {
 }
 
 
-fn test_is_heap<I: Indexer+Default>(n: usize) {
+fn test_is_heap<I: Indexer+Copy>(idxer: &I, n: usize) {
     assert!(n > 0);
 
     print!("    test_is_heap(n={})", n);
+    
 
-    let mut heap: GHeap<usize, MaxComparator, I> = GHeap::new_indexer();
+    let mut heap: GHeap<usize, MaxComparator, I> = GHeap::new_indexer(*idxer);
 
     heap.clear();
     for i in 0 .. n {
@@ -61,22 +67,48 @@ fn test_is_heap<I: Indexer+Default>(n: usize) {
     passed();
 }
 
+fn init_array(n: usize) -> Vec<usize> {
+    let mut rng = thread_rng();
+    let dist = Uniform::from(0..std::usize::MAX);
+
+    dist.sample_iter(&mut rng).take(n).collect()
+}
+
+fn test_make_heap<I: Indexer+Copy+Default>(idxer: &I, n: usize) {
+    print!("    test_make_heap(n={})", n);
+    let  v = init_array(n);
+    let mut heap: GHeap<usize, MaxComparator, I> = GHeap::from_vec_indexer(v, *idxer);
+    assert!(heap.is_heap());
+    passed();
+}
+
+fn test_func<I: Indexer>(idxer: &I, func: fn(&I, usize)) {
+    for i in 1 .. 12 {
+        func(idxer, i);
+    }
+    func(idxer, 1001);
+}
+
 macro_rules! test_all {
     ($( $s:ident, $f:literal, $p:literal)+) => {
         $(
             def_indexer!($s, $f, $p);
+            println!("  test_all({}, {}, {}) started", stringify!($s), $f, $p);
             let idx = $s {};
             test_all(&idx);
-        
+            println!("  test_all({}, {}, {}) OK", stringify!($s), $f, $p);
         )+
         
     };
 }
 
-fn test_all<I: Indexer+Default>(idx: &I) {
+fn test_all<I: Indexer+Copy+Default>(idx: &I) {
     let n = 1000000;
     test_parent_child(idx, 1, n);
     test_parent_child(idx, std::usize::MAX - n, n);
+
+    test_func(idx, test_is_heap::<I>);
+    test_func(idx, test_make_heap::<I>);
 }
 
 #[test]
