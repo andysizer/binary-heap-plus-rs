@@ -581,13 +581,27 @@ impl<T, C: Compare<T>, I: Indexer> GHeap<T, C, I> {
 
 impl<T: Ord> GHeap<T> {
     
+    /// Creates an empty max heap.
     pub fn new() -> Self {
         GHeap::from_vec(vec![])
     }
 
-    
+    /// Creates a max heap with a pre-allocated capacity
     pub fn with_capacity(capacity: usize) -> Self {
         GHeap::from_vec(Vec::with_capacity(capacity))
+    }
+}
+
+impl<T: Ord, I: Indexer+Default> GHeap<T, MaxComparator, I> {
+    
+    /// Creates an empty max heap with a custom indexer
+    pub fn new_indexer() -> Self {
+        GHeap::from_vec_indexer(vec![], I::default())
+    }
+
+        /// Creates a max heap with a pre-allocated capacity and a custom indexer
+    pub fn with_capacity_indexer(capacity: usize) -> Self {
+        GHeap::from_vec_indexer(Vec::with_capacity(capacity),I::default())
     }
 }
 
@@ -1446,6 +1460,18 @@ impl<T, C: Compare<T>, I: Indexer> GHeap<T, C, I> {
         } else {
             self.extend(other.drain());
         }
+    }
+
+    pub fn is_heap(&mut self) -> bool {
+        let end = self.len();
+        for i in 1 .. end {
+            let v = self.indexer.get_parent_index(i);
+            if self.cmp.compare(&self.data[v], &self.data[i]) == Ordering::Less {
+                return false;
+            }
+    
+        }
+        return true;
     }
 }
 
