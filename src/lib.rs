@@ -92,6 +92,8 @@
 //!
 //! * `GHeap::from_vec(vec)`
 //! * `GHeap::from_vec_cmp(vec, cmp)`
+//! * `GHeap::from_vec_indexer(vec, indexer)`
+//! * `GHeap::from_vec_cmp_indexer(vec, cmp, indexer)`
 //!
 //! ```
 //! use gheap::*;
@@ -118,6 +120,23 @@
 //! assert_eq!(heap1.pop(), Some(3));
 //! let mut heap2 = GHeap::from_vec_cmp(vec![2,4,1], mod4_comparator);
 //! assert_eq!(heap2.pop(), Some(2));
+//! 
+//! // max heap with a customized indexer
+//! def_indexer!(ThreeTwoIndexer, 3,2);
+//! let idxer = ThreeTwoIndexer{}; 
+//! let mut heap: GHeap<i32, MaxComparator,ThreeTwoIndexer> = GHeap::from_vec_indexer(
+//!     vec![1,5,3], 
+//!     idxer
+//! );
+//! assert_eq!(heap.pop(), Some(5));
+//! 
+//! // custom-key heap with custom indexer
+//! let mut heap = GHeap::from_vec_cmp_indexer(
+//!     vec![6,3,1],
+//!     mod4_comparator, 
+//!     idxer
+//! );
+//! assert_eq!(heap.pop(), Some(3));
 //! ```
 //!
 //! ## Dedicated methods to create different kind of heaps
