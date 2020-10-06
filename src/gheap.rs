@@ -592,16 +592,16 @@ impl<T: Ord> GHeap<T> {
     }
 }
 
-impl<T: Ord, I: Indexer+Default> GHeap<T, MaxComparator, I> {
+impl<T: Ord, I: Indexer> GHeap<T, MaxComparator, I> {
     
     /// Creates an empty max heap with a custom indexer
-    pub fn new_indexer() -> Self {
-        GHeap::from_vec_indexer(vec![], I::default())
+    pub fn new_indexer(idxer: I) -> Self {
+        GHeap::from_vec_indexer(vec![], idxer)
     }
 
         /// Creates a max heap with a pre-allocated capacity and a custom indexer
-    pub fn with_capacity_indexer(capacity: usize) -> Self {
-        GHeap::from_vec_indexer(Vec::with_capacity(capacity),I::default())
+    pub fn with_capacity_indexer(capacity: usize, idxer: I) -> Self {
+        GHeap::from_vec_indexer(Vec::with_capacity(capacity), idxer)
     }
 }
 
@@ -1402,7 +1402,7 @@ impl<T, C: Compare<T>, I: Indexer> GHeap<T, C, I> {
     }
 
     fn rebuild(&mut self) {
-        let mut n = self.len() / 2;
+        let mut n = self.len();
         while n > 0 {
             n -= 1;
             self.sift_down(n);
