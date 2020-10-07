@@ -1,23 +1,23 @@
 
-
-
-use gheap::*;
+use std::panic;
 
 use rand::thread_rng;
 use rand::distributions::{Distribution, Uniform};
 
+use gheap::*;
+
 #[cfg(test)]
 
 fn passed() {
-    println!(" OK");
+    println!("ok");
 }
 
-fn test_parent_child<I: Indexer>(idxer: &I, start_index: usize, n: usize) {
+fn test_parent_child<I: Indexer>(idxer: &I, idx_type: &str, start_index: usize, n: usize) {
 
     assert!(start_index > 0);
     assert!(start_index <= std::usize::MAX - n);
 
-    print!("    test_parent_child(start_index={}, n={})", start_index, n);
+    print!("    test_parent_child<{}>(start_index={}, n={}) ... ", idx_type, start_index, n);
 
     for i in 0..n {
         let u = start_index + i;
@@ -38,10 +38,10 @@ fn test_parent_child<I: Indexer>(idxer: &I, start_index: usize, n: usize) {
 }
 
 
-fn test_is_heap<I: Indexer+Copy>(idxer: &I, n: usize) {
+fn test_is_heap<I: Indexer+Copy>(idxer: &I, idx_type: &str, n: usize) {
     assert!(n > 0);
 
-    print!("    test_is_heap(n={})", n);
+    print!("    test_is_heap<{}>(n={}) ... ", idx_type, n);
     
 
     let mut heap: GHeap<usize, MaxComparator, I> = GHeap::new_indexer(*idxer);
@@ -74,8 +74,8 @@ fn init_array(n: usize) -> Vec<usize> {
     dist.sample_iter(&mut rng).take(n).collect()
 }
 
-fn test_make_heap<I: Indexer+Copy+Default>(idxer: &I, n: usize) {
-    print!("    test_make_heap(n={})", n);
+fn test_make_heap<I: Indexer+Copy+Default>(idxer: &I, idx_type: &str, n: usize) {
+    print!("    test_make_heap<{}>(n={}) ... ", idx_type, n);
     let  v = init_array(n);
     let mut heap: GHeap<usize, MaxComparator, I> = GHeap::from_vec_indexer(v, *idxer);
     assert!(heap.is_heap());
@@ -98,8 +98,8 @@ fn assert_sorted_desc(v: Vec<usize>) {
     }
 }
 
-fn test_sort_heap<I: Indexer+Copy+Default>(idxer: &I, n: usize) {
-    print!("    test_sort_heap(n={})", n);
+fn test_sort_heap<I: Indexer+Copy+Default>(idxer: &I, idx_type: &str, n: usize) {
+    print!("    test_sort_heap<{}>(n={}) ... ", idx_type, n);
     let  v = init_array(n);
     let heap: GHeap<usize, MaxComparator, I> = GHeap::from_vec_indexer(v, *idxer);
     let v = heap.into_sorted_vec();
@@ -113,11 +113,11 @@ fn test_sort_heap<I: Indexer+Copy+Default>(idxer: &I, n: usize) {
     passed();
 }
 
-fn test_func<I: Indexer>(idxer: &I, func: fn(&I, usize)) {
+fn test_func<I: Indexer>(idxer: &I, idx_type: &str, func: fn(&I, idx_type: &str, usize)) {
     for i in 1 .. 12 {
-        func(idxer, i);
+        func(idxer, idx_type, i);
     }
-    func(idxer, 1001);
+    func(idxer, idx_type, 1001);
 }
 
 macro_rules! test_all {
@@ -127,24 +127,29 @@ macro_rules! test_all {
              fn [< test_indexer_ $fanout _ $page_chunks >] () {
                  
                 def_indexer!([< Indexer $fanout _ $page_chunks>], $fanout, $page_chunks);
-                //println!("  {}({},{}) started", stringify!([< test_ $indexer_name:snake >]), $fanout, $page_chunks);
                 let idx = [< Indexer $fanout _ $page_chunks>] {};
-                test_all(&idx);
-                //println!("  {}({},{}) done", stringify!([< test_ $indexer_name:snake >]), $fanout, $page_chunks);
+                test_all(&idx, stringify!([< Indexer $fanout _ $page_chunks>]));
 
              }
         
             }
     };
 }
-fn test_all<I: Indexer+Copy+Default>(idx: &I) {
-    let n = 1000000;
-    test_parent_child(idx, 1, n);
-    test_parent_child(idx, std::usize::MAX - n, n);
+fn test_all<I: Indexer+Copy+Default + std::panic::RefUnwindSafe>(idx: &I, idx_type: &str) {
+    let result = panic::catch_unwind(|| {
 
-    test_func(idx, test_is_heap::<I>);
-    test_func(idx, test_make_heap::<I>);
-    test_func(idx, test_sort_heap::<I>);
+        let n = 1000000;
+        test_parent_child(idx, idx_type, 1, n);
+        test_parent_child(idx, idx_type, std::usize::MAX - n, n);
+
+        test_func(idx, idx_type, test_is_heap::<I>);
+        test_func(idx, idx_type, test_make_heap::<I>);
+        test_func(idx, idx_type, test_sort_heap::<I>);
+        
+    });
+    if result.is_err() {
+        println!("FAILED");
+    }
 }
 
     
