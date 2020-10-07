@@ -1,8 +1,11 @@
 
 use std::panic;
+use std::cmp::Ordering;
 
 use rand::thread_rng;
 use rand::distributions::{Distribution, Uniform};
+
+use stdext::{function_name};
 
 use gheap::*;
 
@@ -17,7 +20,7 @@ fn test_parent_child<I: Indexer>(idxer: &I, idx_type: &str, start_index: usize, 
     assert!(start_index > 0);
     assert!(start_index <= std::usize::MAX - n);
 
-    print!("    test_parent_child<{}>(start_index={}, n={}) ... ", idx_type, start_index, n);
+    print!("    {}<{}>(start_index={}, n={}) ... ", function_name!(), idx_type, start_index, n);
 
     for i in 0..n {
         let u = start_index + i;
@@ -41,8 +44,7 @@ fn test_parent_child<I: Indexer>(idxer: &I, idx_type: &str, start_index: usize, 
 fn test_is_heap<I: Indexer+Copy>(idxer: &I, idx_type: &str, n: usize) {
     assert!(n > 0);
 
-    print!("    test_is_heap<{}>(n={}) ... ", idx_type, n);
-    
+    print!("    {}<{}>(n={}) ... ", function_name!(), idx_type, n);    
 
     let mut heap: GHeap<usize, MaxComparator, I> = GHeap::new_indexer(*idxer);
 
@@ -75,7 +77,10 @@ fn init_array(n: usize) -> Vec<usize> {
 }
 
 fn test_make_heap<I: Indexer+Copy+Default>(idxer: &I, idx_type: &str, n: usize) {
-    print!("    test_make_heap<{}>(n={}) ... ", idx_type, n);
+
+    print!("    {}<{}>(n={}) ... ", function_name!(), idx_type, n);    
+
+
     let  v = init_array(n);
     let mut heap: GHeap<usize, MaxComparator, I> = GHeap::from_vec_indexer(v, *idxer);
     assert!(heap.is_heap());
@@ -99,7 +104,9 @@ fn assert_sorted_desc(v: Vec<usize>) {
 }
 
 fn test_sort_heap<I: Indexer+Copy+Default>(idxer: &I, idx_type: &str, n: usize) {
-    print!("    test_sort_heap<{}>(n={}) ... ", idx_type, n);
+
+    print!("    {}<{}>(n={}) ... ", function_name!(), idx_type, n);    
+
     let  v = init_array(n);
     let heap: GHeap<usize, MaxComparator, I> = GHeap::from_vec_indexer(v, *idxer);
     let v = heap.into_sorted_vec();
@@ -109,6 +116,42 @@ fn test_sort_heap<I: Indexer+Copy+Default>(idxer: &I, idx_type: &str, n: usize) 
     let heap: GHeap<usize, MinComparator, I> = GHeap::from_vec_cmp_indexer(v, MinComparator{}, *idxer);
     let v = heap.into_sorted_vec();
     assert_sorted_desc(v);
+
+    passed();
+}
+
+fn test_push_heap<I: Indexer+Copy+Default>(idxer: &I, idx_type: &str, n: usize) {
+
+    print!("    {}<{}>(n={}) ... ", function_name!(), idx_type, n);    
+    
+    let  v = init_array(n);
+
+    let mut heap: GHeap<usize, MaxComparator, I> = GHeap::with_capacity_indexer(n, *idxer);
+    for i in v {
+        heap.push(i);
+        assert!(heap.is_heap())
+    }
+
+    passed();
+}
+fn test_pop_heap<I: Indexer+Copy+Default>(idxer: &I, idx_type: &str, n: usize) {
+
+    print!("    {}<{}>(n={}) ... ", function_name!(), idx_type, n);    
+    
+    let  v = init_array(n);
+
+    let mut heap: GHeap<usize, MaxComparator, I> = GHeap::from_vec_indexer(v, *idxer);
+    assert!(heap.is_heap());
+
+    let mut last = heap.pop();
+    assert!(heap.is_heap());
+
+    for _i in 0 .. n -1 {
+        let current = heap.pop();
+        assert!(heap.is_heap());
+        assert_ne!(last.cmp(&current), Ordering::Less);
+        last = current;
+    }
 
     passed();
 }
@@ -145,6 +188,8 @@ fn test_all<I: Indexer+Copy+Default + std::panic::RefUnwindSafe>(idx: &I, idx_ty
         test_func(idx, idx_type, test_is_heap::<I>);
         test_func(idx, idx_type, test_make_heap::<I>);
         test_func(idx, idx_type, test_sort_heap::<I>);
+        test_func(idx, idx_type, test_push_heap::<I>);
+        test_func(idx, idx_type, test_pop_heap::<I>);
 
     });
     if let Err(err) = result {
