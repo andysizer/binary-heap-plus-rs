@@ -82,6 +82,37 @@ fn test_make_heap<I: Indexer+Copy+Default>(idxer: &I, n: usize) {
     passed();
 }
 
+#[inline]
+fn assert_sorted_asc(v: Vec<usize>) {
+    let end = v.len();
+    for i in 1 .. end {
+        assert!(v[i] >= v[i -1]);
+    }
+}
+
+#[inline]
+fn assert_sorted_desc(v: Vec<usize>) {
+    let end = v.len();
+    for i in 1 .. end {
+        assert!(v[i] <= v[i -1]);
+    }
+}
+
+fn test_sort_heap<I: Indexer+Copy+Default>(idxer: &I, n: usize) {
+    print!("    test_sort_heap(n={})", n);
+    let  v = init_array(n);
+    let heap: GHeap<usize, MaxComparator, I> = GHeap::from_vec_indexer(v, *idxer);
+    let v = heap.into_sorted_vec();
+    assert_sorted_asc(v);
+
+    let  v = init_array(n);
+    let heap: GHeap<usize, MinComparator, I> = GHeap::from_vec_cmp_indexer(v, MinComparator{}, *idxer);
+    let v = heap.into_sorted_vec();
+    assert_sorted_desc(v);
+
+    passed();
+}
+
 fn test_func<I: Indexer>(idxer: &I, func: fn(&I, usize)) {
     for i in 1 .. 12 {
         func(idxer, i);
@@ -109,6 +140,7 @@ fn test_all<I: Indexer+Copy+Default>(idx: &I) {
 
     test_func(idx, test_is_heap::<I>);
     test_func(idx, test_make_heap::<I>);
+    test_func(idx, test_sort_heap::<I>);
 }
 
 #[test]
