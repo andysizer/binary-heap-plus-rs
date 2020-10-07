@@ -145,11 +145,13 @@ fn test_all<I: Indexer+Copy+Default + std::panic::RefUnwindSafe>(idx: &I, idx_ty
         test_func(idx, idx_type, test_is_heap::<I>);
         test_func(idx, idx_type, test_make_heap::<I>);
         test_func(idx, idx_type, test_sort_heap::<I>);
-        
+
     });
-    if result.is_err() {
+    if let Err(err) = result {
         println!("FAILED");
+        panic::resume_unwind(err);
     }
+    
 }
 
     
