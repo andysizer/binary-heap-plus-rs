@@ -121,18 +121,21 @@ fn test_func<I: Indexer>(idxer: &I, func: fn(&I, usize)) {
 }
 
 macro_rules! test_all {
-    ($( $s:ident, $f:literal, $p:literal)+) => {
-        $(
-            def_indexer!($s, $f, $p);
-            println!("  test_all({}, {}, {}) started", stringify!($s), $f, $p);
-            let idx = $s {};
-            test_all(&idx);
-            println!("  test_all({}, {}, {}) OK", stringify!($s), $f, $p);
-        )+
+    ( $indexer_name:ident, $fanout:literal, $page_chunks:literal) => {
+         paste::item! { 
+             #[test] 
+             fn [< test_ $indexer_name:snake >] () {
+                def_indexer!($indexer_name, $fanout, $page_chunks);
+                //println!("  {}({},{}) started", stringify!([< test_ $indexer_name:snake >]), $fanout, $page_chunks);
+                let idx = $indexer_name {};
+                test_all(&idx);
+                //println!("  {}({},{}) done", stringify!([< test_ $indexer_name:snake >]), $fanout, $page_chunks);
+
+             }
         
+            }
     };
 }
-
 fn test_all<I: Indexer+Copy+Default>(idx: &I) {
     let n = 1000000;
     test_parent_child(idx, 1, n);
@@ -143,40 +146,33 @@ fn test_all<I: Indexer+Copy+Default>(idx: &I) {
     test_func(idx, test_sort_heap::<I>);
 }
 
-#[test]
-fn main_test() {
-    println!("    main_test() start");
     
-    test_all!(TI1_1, 1,1);
-    test_all!(TI2_1, 2,1);
-    test_all!(TI3_1, 3,1);
-    test_all!(TI4_1, 4,1);
-    test_all!(TI101_1, 101,1);
+test_all!(Indexer1_1, 1,1);
+test_all!(Indexer2_1, 2,1);
+test_all!(Indexer3_1, 3,1);
+test_all!(Indexer4_1, 4,1);
+test_all!(Indexer101_1, 101,1);
 
-    test_all!(TI1_2, 1,2);
-    test_all!(TI2_2, 2,2);
-    test_all!(TI3_2, 3,2);
-    test_all!(TI4_2, 4,2);
-    test_all!(TI101_2, 101,2);
+test_all!(Indexer1_2, 1,2);
+test_all!(Indexer2_2, 2,2);
+test_all!(Indexer3_2, 3,2);
+test_all!(Indexer4_2, 4,2);
+test_all!(Indexer101_2, 101,2);
 
-    test_all!(TI1_3, 1,3);
-    test_all!(TI2_3, 2,3);
-    test_all!(TI3_3, 3,3);
-    test_all!(TI4_3, 4,3);
-    test_all!(TI101_3, 101,3);
+test_all!(Indexer1_3, 1,3);
+test_all!(Indexer2_3, 2,3);
+test_all!(Indexer3_3, 3,3);
+test_all!(Indexer4_3, 4,3);
+test_all!(Indexer101_3, 101,3);
 
-    test_all!(TI1_4, 1,4);
-    test_all!(TI2_4, 2,4);
-    test_all!(TI3_4, 3,4);
-    test_all!(TI4_4, 4,4);
-    test_all!(TI101_4, 101,4);
+test_all!(Indexer1_4, 1,4);
+test_all!(Indexer2_4, 2,4);
+test_all!(Indexer3_4, 3,4);
+test_all!(Indexer4_4, 4,4);
+test_all!(Indexer101_4, 101,4);
 
-    test_all!(TI1_101, 1,101);
-    test_all!(TI2_101, 2,101);
-    test_all!(TI3_101, 3,101);
-    test_all!(TI4_101, 4,101);
-    test_all!(TI101_101, 101,101);
-
-    println!("    main_test() OK");
-
-}
+test_all!(Indexer1_101, 1,101);
+test_all!(Indexer2_101, 2,101);
+test_all!(Indexer3_101, 3,101);
+test_all!(Indexer4_101, 4,101);
+test_all!(Indexer101_101, 101,101);
