@@ -1469,9 +1469,8 @@ impl<T, C: Compare<T>, I: Indexer> GHeap<T, C, I> {
             if self.cmp.compare(&self.data[v], &self.data[i]) == Ordering::Less {
                 return false;
             }
-    
         }
-        return true;
+        true
     }
 }
 
