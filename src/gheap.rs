@@ -542,34 +542,46 @@ impl<T, C: Compare<T>> GHeap<T, C, DefaultIndexer> {
     }
 }
 
-impl<T, C: Compare<T> + Default, I: Indexer> GHeap<T, C, I> {
+impl<T: Ord, C: Compare<T>+Default, I: Indexer> GHeap<T, C, I> {
 
-    /// Generic constructor for `GHeap` from `Vec` and indexer.
+    /// Constructs a `GHeap` from `vec` and `indexer`. Defaults to a max heap.
     ///
-    /// Because `GHeap` stores the elements in its internal `Vec`,
-    /// it's natural to construct it from `Vec`.
+    /// Takes ownership of `vec` and `indexer`.
     pub fn from_vec_indexer(vec: Vec<T>, indexer: I) -> Self {
         GHeap::from_vec_cmp_indexer(vec, C::default(), indexer)
     }
 }
 
+impl<T: Ord, I: Indexer> GHeap<T, MinComparator, I> {
+
+    /// Constructs a min `GHeap` from `vec` and `indexer`.
+    ///
+    /// Takes ownership of `vec` and `indexer`.
+    /// 
+    /// A convenience function to avoid having to make a type declaration.
+    pub fn from_vec_min_indexer(vec: Vec<T>, indexer: I) -> Self {
+        GHeap::from_vec_cmp_indexer(vec, MinComparator::default(), indexer)
+    }
+
+}
+
 impl<T, C: Compare<T>, I: Indexer> GHeap<T, C, I> {
 
-    /// Generic constructor for `GHeap` from `Vec`, comparator and indexer.
+    /// Constructs a `GHeap` from `vec`, `cmp` and `indexer`. 
     ///
-    /// Because `GHeap` stores the elements in its internal `Vec`,
-    /// it's natural to construct it from `Vec`.
+    /// Takes ownership of `vec`, `cmp` and `indexer`.
     pub fn from_vec_cmp_indexer(vec: Vec<T>, cmp: C, indexer: I) -> Self {
         unsafe { GHeap::from_vec_cmp_indexer_raw(vec, cmp, indexer, true) }
     }
 
-    /// Generic constructor for `GHeap` from `Vec` and comparator.
+    /// Constructs a `GHeap` from `vec`, `cmp` and `indexer`. Set `rebuild`
+    /// `true` to ensure the heap has the (generic) heap property.
     ///
-    /// Because `GHeap` stores the elements in its internal `Vec`,
-    /// it's natural to construct it from `Vec`.
-    ///
+    /// Takes ownership of `vec`, `cmp` and `indexer`.
+    /// 
     /// # Safety
-    /// User is responsible for providing valid `rebuild` value.
+    /// If `vec` is known to have the heap property, the potentially expensive rebuild is unnecessary.
+    /// The caller can avoid this by setting `rebuild` `false`. An incorrect value is inherently 'unsafe'.
     pub unsafe fn from_vec_cmp_indexer_raw(vec: Vec<T>, cmp: C, indexer: I, rebuild: bool) -> Self {
         let mut heap = GHeap { data: vec, cmp, indexer};
         if rebuild && !heap.data.is_empty() {
@@ -581,7 +593,7 @@ impl<T, C: Compare<T>, I: Indexer> GHeap<T, C, I> {
 
 impl<T: Ord> GHeap<T> {
     
-    /// Creates an empty max heap.
+    /// Constructs an empty max `GHeap` that uses the `DefaultIndexer`
     pub fn new() -> Self {
         GHeap::from_vec(vec![])
     }
@@ -669,7 +681,7 @@ impl<T: Ord, I: Indexer> GHeap<T, MinComparator, I> {
     /// assert_eq!(heap.pop(), Some(1));
     /// ```
     pub fn new_min_indexer(indexer: I) -> Self {
-        GHeap::from_vec_indexer(vec![], indexer)
+        GHeap::from_vec_min_indexer(vec![], indexer)
     }
 
     /// Creates an empty `GHeap` with a specific capacity and a supplied indexer.
@@ -693,7 +705,7 @@ impl<T: Ord, I: Indexer> GHeap<T, MinComparator, I> {
     /// assert_eq!(heap.pop(), Some(1));
     /// ```
     pub fn with_capacity_min_indexer(capacity: usize, indexer :I) -> Self {
-        GHeap::from_vec_indexer(Vec::with_capacity(capacity), indexer)
+        GHeap::from_vec_min_indexer(Vec::with_capacity(capacity), indexer)
     }
 }
 
@@ -1929,3 +1941,4 @@ impl<'a, T: 'a + Copy, C: Compare<T>, G: Indexer> Extend<&'a T> for GHeap<T, C, 
 //         heap.data.get_unchecked(i)
 //     }
 // }
+
