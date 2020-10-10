@@ -1,16 +1,18 @@
 //! This crate provides `GHeap` which is derived from 2 sources:
-//! 1. binary-heap-plus (https://github.com/sekineh/binary-heap-plus-rs)
+//! 1. [binary-heap-plus](https://github.com/sekineh/binary-heap-plus-rs)
 //!    which is itself forked from the version of BinaryHeap in the Rust standard library.
-//! 2. The C++ version of gheap found at  https://github.com/valyala/gheap.git
+//! 2. The C++ version of [gheap](https://github.com/valyala/gheap.git)
 //!
-//! GHeap implements a 'paged' n-ary heap. 'Paging' is motivated by the article
-//! at https://queue.acm.org/detail.cfm?id=1814327 (You're Doing It Wrong) which
-//! introduces the B-heap. The B-heap is intended to be more VM/cache friendly.
+//! `GHeap` implements a n-ary heap in which subtrees are laid out contiguously in a single 'page' and 
+//! can be used as a [Priority Queue](https://www.wikiwand.com/en/Priority_queue#:~:text=In%20computer%20science%2C%20a%20priority,an%20element%20with%20low%20priority.). 
+//! It is motivated by the article ['You're Doing It Wrong'](https://queue.acm.org/detail.cfm?id=1814327) which
+//! introduces the [B-heap](https://www.wikiwand.com/en/B-heap).
 //! 
 //! The main difference between a binary heap and a B-heap are the equations used
-//! to compute the indices of child and parent nodes in the heap. This code abstracts those out into
-//! a trait: Indexer. The primary reason for this is Rust's (current) lack of support
-//! for the equivalent of C++'s template literals (i.e. GHeap<i32, 4, 2> is currently not valid Rust).
+//! to compute the indices of parent and child nodes in the heap. `GHeap` abstracts these computations out into
+//! a trait: `Indexer`. The primary reason for this is Rust's lack of support
+//! for const generics (i.e. rustc will reject 'GHeap<i32, 4, 2>'). 
+//! This may change: see [Shipping Const Generics in 2020](https://without.boats/blog/shipping-const-generics/).
 //! 
 //! GHeap has three generic type parameters:
 //! 1. T - the type contained in the heap.
