@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, Criterion, BatchSize};
 
 use rand::{Rng};
 use rand::distributions::{Distribution, Standard};
@@ -99,33 +99,54 @@ Standard: Distribution<T>
 
     Standard.sample_iter(&mut rng).take(n).collect()
 }
+
+fn add_memory_pressure(mb: usize) -> Vec<u8> { Vec::with_capacity(1024 * 1024 * mb)}
+
+fn bench_from_vec<H, T>(funk: & dyn Fn(Vec<T>) -> H, v: Vec<T>) {
+    funk(v);
+}
+
+fn ensure_mem_pressure(mut m: Vec<u8>) {
+    m.push(1);
+}
+
 fn criterion_benchmark(c: &mut Criterion) {
 
-    let usize_vec: Vec<usize> = init_array(250000000);
-    //let usize_vec1: Vec<usize> = init_array(1000000);
-    //if usize_vec != usize_vec1 {
-    //    println!("ftw!!!")
-    //}
+    let usize_vec: Vec<usize> = init_array(32000000);
+    
+    let megabytes = 1500 * 2;
 
-    //c.bench_function("fib 20", |b| b.iter(|| fibonacci(black_box(20))));
+    let setup_from_vec_usize = || usize_vec.clone();
 
+    let mem_pressure = add_memory_pressure(megabytes);
+
+    
     c.bench_function("GHeap<usize, MaxComparator, DefaultIndexer>::from_vec usize 1000000", 
-        |b| {
-            
-            b.iter(|| {
-                let working = usize_vec.clone();
-                let _heap: GHeap<usize, MaxComparator, DefaultIndexer> = GHeap::from_vec(working);
-            });
+    |b| {
+
+        
+        b.iter_batched(setup_from_vec_usize,
+            |v| {
+            bench_from_vec::<GHeap<usize, MaxComparator, DefaultIndexer>, usize>(&GHeap::from_vec, v);
+            },
+            BatchSize::LargeInput);
+
     });
 
     c.bench_function("BinaryHeap<usize>::from_vec usize 1000000", 
-        |b| {
-            
-            b.iter(|| {
-                let working = usize_vec.clone();
-                let _heap: BinaryHeap<usize, MaxComparator> = binary_heap_plus::BinaryHeap::from_vec(working);
-            });
+    |b| {
+
+        
+        b.iter_batched(setup_from_vec_usize,
+            |v| {
+            bench_from_vec::<BinaryHeap<usize, MaxComparator>, usize>(&binary_heap_plus::BinaryHeap::from_vec, v);
+            },
+            BatchSize::LargeInput);
+
     });
+
+    ensure_mem_pressure(mem_pressure);
+
 
 }
 
