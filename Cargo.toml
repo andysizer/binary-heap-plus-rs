@@ -20,6 +20,9 @@ rand_core = "0.5"
 paste = "1.0"
 stdext = "0.2"
 criterion = "0.3"
+nix = "0.19"
+sysinfo = "0.15"
+page_size = "0.4"
 
 [dependencies.binary-heap-plus]
 path = "../binary-heap-plus-rs"
