@@ -319,7 +319,7 @@ pub trait Indexer {
 
     #[inline(always)]
     fn get_parent_index(&self, u: usize) -> usize {
-        assert!(u > 0);
+        debug_assert!(u > 0);
 
         let fanout = self.get_fanout();
         let page_chunks = self.get_page_chunks();
@@ -330,7 +330,7 @@ pub trait Indexer {
             // Parent is root
             0
         } else {
-            assert!(page_chunks <= self.get_page_chunks_max());
+            debug_assert!(page_chunks <= self.get_page_chunks_max());
             let page_size = self.get_page_size();
             let v = u % page_size;
             if v >= fanout {
@@ -348,7 +348,7 @@ pub trait Indexer {
 
     #[inline(always)]
     fn get_child_index(&self, u: usize) -> usize {
-        assert!(u < usize::MAX);
+        debug_assert!(u < usize::MAX);
 
         let fanout = self.get_fanout();
         let page_chunks = self.get_page_chunks();
@@ -364,7 +364,7 @@ pub trait Indexer {
             // Root's child is always 1
             1
         } else {
-            assert!(page_chunks <= self.get_page_chunks_max());
+            debug_assert!(page_chunks <= self.get_page_chunks_max());
             let u = u - 1;
             let page_size = self.get_page_size();
             let v = (u % page_size) + 1;
@@ -1308,7 +1308,7 @@ impl<T, C: Compare<T>, I: Indexer> GHeap<T, C, I> {
                 let child = self.indexer.get_child_index(hole.pos);
                 if child >= last_full_index {
                     if child < end {
-                        assert!(child == last_full_index);
+                        debug_assert!(child == last_full_index);
                         let max_child = hole.get_max_child(child, end);
                         hole.move_to(max_child);              
                     }
@@ -1413,12 +1413,22 @@ impl<T, C: Compare<T>, I: Indexer> GHeap<T, C, I> {
         self.drain();
     }
 
+    // fn rebuild(&mut self) {
+    //     let mut n = self.len();
+    //     while n > 0 {
+    //         n -= 1;
+    //         self.sift_down(n);
+    //     }
+    // }
+
     fn rebuild(&mut self) {
-        let mut n = self.len();
-        while n > 0 {
-            n -= 1;
-            self.sift_down(n);
+        let n = self.len();
+        for i in 1..n {
+            self.sift_up(0,i);
+            debug_assert!(self.is_partial_heap(i+1));
         }
+        
+        
     }
 
     /// Moves all the elements of `other` into `self`, leaving `other` empty.
@@ -1476,6 +1486,17 @@ impl<T, C: Compare<T>, I: Indexer> GHeap<T, C, I> {
 
     pub fn is_heap(&mut self) -> bool {
         let end = self.len();
+        for i in 1 .. end {
+            let v = self.indexer.get_parent_index(i);
+            if self.cmp.compare(&self.data[v], &self.data[i]) == Ordering::Less {
+                return false;
+            }
+        }
+        true
+    }
+
+    #[inline]
+    pub fn is_partial_heap(&mut self, end: usize) -> bool {
         for i in 1 .. end {
             let v = self.indexer.get_parent_index(i);
             if self.cmp.compare(&self.data[v], &self.data[i]) == Ordering::Less {
