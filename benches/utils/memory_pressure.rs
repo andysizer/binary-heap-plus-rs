@@ -145,13 +145,8 @@ fn mem_hog(requirement: u64, tx: Sender<ProviderMsg>, rx: Receiver<ClientMsg>) {
         n_hogs * hog_alloc
     );
 
-    // Allocate the hog vec. The fork will 'replicate' this in the hogs. N.B. This process
-    // has a copy of the vec which we didn't take account of in our memory
-    // consumption 'calculations'.
-    let mut hog_vec: Vec<u64> = (0..hog_vec_size).into_iter().collect();
-
     // Fork the hogs
-    let hogs = fork_hogs(n_hogs, &mut hog_vec);
+    let hogs = fork_hogs(n_hogs, hog_vec_size);
 
     loop {
         sys_info.refresh_system();
@@ -184,11 +179,11 @@ fn mem_hog(requirement: u64, tx: Sender<ProviderMsg>, rx: Receiver<ClientMsg>) {
     kill_hogs(&hogs);
 }
 
-fn fork_hogs(mut n_hogs: u64, v: &Vec<u64>) -> Vec<Pid> {
+fn fork_hogs(mut n_hogs: u64, size: u64) -> Vec<Pid> {
     let mut hogs = vec![];
 
     while n_hogs > 0 {
-        if !fork_hog(v.to_vec(), &mut hogs) {
+        if !fork_hog(size, &mut hogs) {
             sleep(Duration::from_millis(50));
             continue;
         }
@@ -198,7 +193,7 @@ fn fork_hogs(mut n_hogs: u64, v: &Vec<u64>) -> Vec<Pid> {
     hogs
 }
 
-fn fork_hog(v: Vec<u64>, hogs: &mut Vec<Pid>) -> bool {
+fn fork_hog(size: u64, hogs: &mut Vec<Pid>) -> bool {
     match unsafe { fork() }.expect("Error: Fork Failed") {
         Parent { child } => {
             // Give the hog a chance to warm up.
@@ -219,7 +214,7 @@ fn fork_hog(v: Vec<u64>, hogs: &mut Vec<Pid>) -> bool {
             }
         }
         Child => {
-            hog(v);
+            hog(size);
             false
         }
     }
@@ -234,24 +229,12 @@ fn kill_hogs(hogs: &Vec<Pid>) {
     }
 }
 
-fn hog(mut mem: Vec<u64>) {
+fn hog(size: u64) {
+    let mut mem: Vec<u64> = (0..size).into_iter().collect();
+
     let rng: HeapRng = HeapRng::new();
     let index_range = Uniform::new_inclusive(1, mem.len() - 1);
     let mut index_iter = index_range.sample_iter(rng);
-    let pgsz = page_size::get();
-    let delta = pgsz / std::mem::size_of::<u64>();
-    let end = mem.len();
-    let mut i = 0;
-    let mut acc = 0;
-
-    loop {
-        acc += mem[i];
-        i += delta;
-        if i >= end {
-            mem[0] = acc;
-            break;
-        }
-    }
 
     loop {
         for _i in 0..10000 {
