@@ -1427,8 +1427,6 @@ impl<T, C: Compare<T>, I: Indexer> GHeap<T, C, I> {
             self.sift_up(0,i);
             debug_assert!(self.is_partial_heap(i+1));
         }
-        
-        
     }
 
     /// Moves all the elements of `other` into `self`, leaving `other` empty.
