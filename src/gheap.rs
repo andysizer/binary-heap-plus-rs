@@ -353,10 +353,10 @@ pub trait Indexer {
         let fanout = self.get_fanout();
         let page_chunks = self.get_page_chunks();
         if page_chunks == 1 {
-            if u > ((usize::MAX  - 1) / fanout) {
+            if u > ((usize::MAX - 1) / fanout) {
                 // Child overflow
                 // It's reasonable to return usize::MAX  here, since OOM will have occured already.
-                usize::MAX 
+                usize::MAX
             } else {
                 (u * fanout) + 1
             }
@@ -370,7 +370,7 @@ pub trait Indexer {
             let v = (u % page_size) + 1;
             if v < page_chunks {
                 // Fast path. Child is on same page as parent
-                let v = v * (fanout -1);
+                let v = v * (fanout - 1);
                 // help the constant folder a bit
                 let max_less_2 = usize::MAX - 2;
                 let lim = max_less_2 - v;
@@ -404,16 +404,16 @@ macro_rules! def_indexer {
             #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
             #[derive(Clone, Copy, Default, Debug)]
             pub struct $s {}
-        
-            impl Indexer for $s {
-                #[inline(always)] 
-                fn get_fanout(&self) -> usize { $f } 
 
-                #[inline(always)] 
-                fn get_page_chunks(&self) -> usize { $p } 
+            impl Indexer for $s {
+                #[inline(always)]
+                fn get_fanout(&self) -> usize { $f }
+
+                #[inline(always)]
+                fn get_page_chunks(&self) -> usize { $p }
 
             })+
-        
+
     };
 }
 
@@ -421,14 +421,17 @@ macro_rules! def_indexer {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, Default, Debug)]
 pub struct DefaultIndexer {}
-        
+
 impl Indexer for DefaultIndexer {
-    #[inline(always)] 
-    fn get_fanout(&self) -> usize { 4 } 
+    #[inline(always)]
+    fn get_fanout(&self) -> usize {
+        4
+    }
 
-    #[inline(always)] 
-    fn get_page_chunks(&self) -> usize { 2 } 
-
+    #[inline(always)]
+    fn get_page_chunks(&self) -> usize {
+        2
+    }
 }
 /// Structure wrapping a mutable reference to the greatest item on a
 /// `GHeap`.
@@ -439,11 +442,11 @@ impl Indexer for DefaultIndexer {
 /// [`peek_mut`]: struct.GHeap.html#method.peek_mut
 /// [`GHeap`]: struct.GHeap.html
 // #[stable(feature = "binary_heap_peek_mut", since = "1.12.0")]
-pub struct PeekMut<'a, T, C, I> 
-where 
-    T: 'a, 
-    C: 'a + Compare<T>, 
-    I: Indexer 
+pub struct PeekMut<'a, T, C, I>
+where
+    T: 'a,
+    C: 'a + Compare<T>,
+    I: Indexer,
 {
     heap: &'a mut GHeap<T, C, I>,
     sift: bool,
@@ -496,7 +499,7 @@ impl<T: Clone, C: Compare<T> + Clone, I: Indexer + Clone> Clone for GHeap<T, C, 
         GHeap {
             data: self.data.clone(),
             cmp: self.cmp.clone(),
-            indexer: self.indexer.clone()
+            indexer: self.indexer.clone(),
         }
     }
 
@@ -532,18 +535,16 @@ impl<T, C: Compare<T> + Default> GHeap<T, C, DefaultIndexer> {
 }
 
 impl<T, C: Compare<T>> GHeap<T, C, DefaultIndexer> {
-
     /// Generic constructor for `GHeap` from `Vec` and comparator.
     ///
     /// Because `GHeap` stores the elements in its internal `Vec`,
     /// it's natural to construct it from `Vec`.
     pub fn from_vec_cmp(vec: Vec<T>, cmp: C) -> Self {
-        GHeap::from_vec_cmp_indexer(vec, cmp, DefaultIndexer{})
+        GHeap::from_vec_cmp_indexer(vec, cmp, DefaultIndexer {})
     }
 }
 
-impl<T: Ord, C: Compare<T>+Default, I: Indexer> GHeap<T, C, I> {
-
+impl<T: Ord, C: Compare<T> + Default, I: Indexer> GHeap<T, C, I> {
     /// Constructs a `GHeap` from `vec` and `indexer`. Defaults to a max heap.
     ///
     /// Takes ownership of `vec` and `indexer`.
@@ -553,21 +554,18 @@ impl<T: Ord, C: Compare<T>+Default, I: Indexer> GHeap<T, C, I> {
 }
 
 impl<T: Ord, I: Indexer> GHeap<T, MinComparator, I> {
-
     /// Constructs a min `GHeap` from `vec` and `indexer`.
     ///
     /// Takes ownership of `vec` and `indexer`.
-    /// 
+    ///
     /// A convenience function to avoid having to make a type declaration.
     pub fn from_vec_min_indexer(vec: Vec<T>, indexer: I) -> Self {
         GHeap::from_vec_cmp_indexer(vec, MinComparator::default(), indexer)
     }
-
 }
 
 impl<T, C: Compare<T>, I: Indexer> GHeap<T, C, I> {
-
-    /// Constructs a `GHeap` from `vec`, `cmp` and `indexer`. 
+    /// Constructs a `GHeap` from `vec`, `cmp` and `indexer`.
     ///
     /// Takes ownership of `vec`, `cmp` and `indexer`.
     pub fn from_vec_cmp_indexer(vec: Vec<T>, cmp: C, indexer: I) -> Self {
@@ -578,12 +576,16 @@ impl<T, C: Compare<T>, I: Indexer> GHeap<T, C, I> {
     /// `true` to ensure the heap has the (generic) heap property.
     ///
     /// Takes ownership of `vec`, `cmp` and `indexer`.
-    /// 
+    ///
     /// # Safety
     /// If `vec` is known to have the heap property, the potentially expensive rebuild is unnecessary.
     /// The caller can avoid this by setting `rebuild` `false`. An incorrect value is inherently 'unsafe'.
     pub unsafe fn from_vec_cmp_indexer_raw(vec: Vec<T>, cmp: C, indexer: I, rebuild: bool) -> Self {
-        let mut heap = GHeap { data: vec, cmp, indexer};
+        let mut heap = GHeap {
+            data: vec,
+            cmp,
+            indexer,
+        };
         if rebuild && !heap.data.is_empty() {
             heap.rebuild();
         }
@@ -592,7 +594,6 @@ impl<T, C: Compare<T>, I: Indexer> GHeap<T, C, I> {
 }
 
 impl<T: Ord> GHeap<T> {
-    
     /// Constructs an empty max `GHeap` that uses the `DefaultIndexer`
     pub fn new() -> Self {
         GHeap::from_vec(vec![])
@@ -605,13 +606,12 @@ impl<T: Ord> GHeap<T> {
 }
 
 impl<T: Ord, I: Indexer> GHeap<T, MaxComparator, I> {
-    
     /// Creates an empty max heap with a custom indexer
     pub fn new_indexer(idxer: I) -> Self {
         GHeap::from_vec_indexer(vec![], idxer)
     }
 
-        /// Creates a max heap with a pre-allocated capacity and a custom indexer
+    /// Creates a max heap with a pre-allocated capacity and a custom indexer
     pub fn with_capacity_indexer(capacity: usize, idxer: I) -> Self {
         GHeap::from_vec_indexer(Vec::with_capacity(capacity), idxer)
     }
@@ -704,7 +704,7 @@ impl<T: Ord, I: Indexer> GHeap<T, MinComparator, I> {
     /// heap.push(5);
     /// assert_eq!(heap.pop(), Some(1));
     /// ```
-    pub fn with_capacity_min_indexer(capacity: usize, indexer :I) -> Self {
+    pub fn with_capacity_min_indexer(capacity: usize, indexer: I) -> Self {
         GHeap::from_vec_min_indexer(Vec::with_capacity(capacity), indexer)
     }
 }
@@ -810,7 +810,7 @@ where
 
 impl<T, F, K: Ord> GHeap<T, KeyComparator<F>>
 where
-    F: Fn(&T) -> K ,
+    F: Fn(&T) -> K,
 {
     /// Creates an empty `GHeap`.
     ///
@@ -1285,7 +1285,7 @@ impl<T, C: Compare<T>, I: Indexer> GHeap<T, C, I> {
         self.sift_down_range(pos, len);
     }
 
-        /// Take an element at `pos` and move it all the way down the heap,
+    /// Take an element at `pos` and move it all the way down the heap,
     /// then sift it up to its position.
     ///
     /// Note: This is faster when the element is known to be large / should
@@ -1310,10 +1310,10 @@ impl<T, C: Compare<T>, I: Indexer> GHeap<T, C, I> {
                     if child < end {
                         debug_assert!(child == last_full_index);
                         let max_child = hole.get_max_child(child, end);
-                        hole.move_to(max_child);              
+                        hole.move_to(max_child);
                     }
                     break;
-                } else{
+                } else {
                     let max_child = hole.get_max_child(child, child + fanout);
                     hole.move_to(max_child);
                 }
@@ -1322,7 +1322,6 @@ impl<T, C: Compare<T>, I: Indexer> GHeap<T, C, I> {
         }
         self.sift_up(start, pos);
     }
-
 
     /// Returns the length of the binary heap.
     ///
@@ -1424,8 +1423,8 @@ impl<T, C: Compare<T>, I: Indexer> GHeap<T, C, I> {
     fn rebuild(&mut self) {
         let n = self.len();
         for i in 1..n {
-            self.sift_up(0,i);
-            debug_assert!(self.is_partial_heap(i+1));
+            self.sift_up(0, i);
+            debug_assert!(self.is_partial_heap(i + 1));
         }
     }
 
@@ -1484,7 +1483,7 @@ impl<T, C: Compare<T>, I: Indexer> GHeap<T, C, I> {
 
     pub fn is_heap(&mut self) -> bool {
         let end = self.len();
-        for i in 1 .. end {
+        for i in 1..end {
             let v = self.indexer.get_parent_index(i);
             if self.cmp.compare(&self.data[v], &self.data[i]) == Ordering::Less {
                 return false;
@@ -1495,7 +1494,7 @@ impl<T, C: Compare<T>, I: Indexer> GHeap<T, C, I> {
 
     #[inline]
     pub fn is_partial_heap(&mut self, end: usize) -> bool {
-        for i in 1 .. end {
+        for i in 1..end {
             let v = self.indexer.get_parent_index(i);
             if self.cmp.compare(&self.data[v], &self.data[i]) == Ordering::Less {
                 return false;
@@ -1505,16 +1504,15 @@ impl<T, C: Compare<T>, I: Indexer> GHeap<T, C, I> {
     }
 }
 
-impl<T, C: Compare<T> + Default, I: Indexer + Default> GHeap<T, C, I> {
-}
+impl<T, C: Compare<T> + Default, I: Indexer + Default> GHeap<T, C, I> {}
 
 /// Hole represents a hole in a slice i.e. an index without valid value
 /// (because it was moved from or duplicated).
 /// In drop, `Hole` will restore the slice by filling the hole
 /// position with the value that was originally removed.
-struct Hole<'a, T: 'a, C = MaxComparator> 
+struct Hole<'a, T: 'a, C = MaxComparator>
 where
-    C: Compare<T>
+    C: Compare<T>,
 {
     data: &'a mut [T],
     /// `elt` is always `Some` from new until drop.
@@ -1575,21 +1573,19 @@ impl<'a, T, C: Compare<T>> Hole<'a, T, C> {
 
     /// find index of max value between start and end. Used to find max_child when sifting down.
     /// Implement via Hole to avoid borrowing the GHeap in callers.
-    /// 
+    ///
     /// unsafe because start and end must be within data slice and not equal to pos
     // TODO: rename??
     #[inline(always)]
     unsafe fn get_max_child(&self, start: usize, end: usize) -> usize {
-        let mut max= start;
-        for i in start + 1 .. end {
-            if self.cmp.compare(self.get(i), self.get(max)) == Ordering::Greater
-            {
+        let mut max = start;
+        for i in start + 1..end {
+            if self.cmp.compare(self.get(i), self.get(max)) == Ordering::Greater {
                 max = i;
             }
         }
         max
     }
-
 }
 
 impl<'a, T, C: Compare<T>> Drop for Hole<'a, T, C> {
@@ -1960,4 +1956,3 @@ impl<'a, T: 'a + Copy, C: Compare<T>, G: Indexer> Extend<&'a T> for GHeap<T, C, 
 //         heap.data.get_unchecked(i)
 //     }
 // }
-
