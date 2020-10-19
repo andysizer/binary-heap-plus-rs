@@ -237,7 +237,7 @@ fn hog(size: u64) {
     let mut index_iter = index_range.sample_iter(rng);
 
     loop {
-        for _i in 0..10000 {
+        for _i in 0..1000000 {
             let trg = index_iter.next().unwrap();
             let src1 = index_iter.next().unwrap();
             let src2 = index_iter.next().unwrap();
@@ -246,7 +246,7 @@ fn hog(size: u64) {
             //     mem[trg] = mem[src1].unchecked_add(mem[src2]);
             // }
             mem[trg] = mem[src1] + mem[src2];
-            sleep(Duration::from_millis(30));
+            sleep(Duration::from_millis(5));
         }
     }
 }
