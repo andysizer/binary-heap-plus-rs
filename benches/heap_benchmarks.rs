@@ -1,15 +1,15 @@
-// #![feature(trace_macros)]
-
-// trace_macros!(true);
 #![allow(unused_parens)]
+#![feature(trace_macros)]
 
-use std::ops::Sub;
+trace_macros!(true);
+
+use std::time::Duration;
 use std::cmp::Ordering;
+use std::ops::Sub;
 
 use compare::Compare;
 
-
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
+use criterion::{criterion_group, criterion_main, BatchSize, Criterion, BenchmarkId};
 
 use rand::distributions::{Distribution, Standard, Uniform};
 
@@ -20,9 +20,8 @@ use binary_heap_plus::BinaryHeap;
 use gheap::*;
 
 mod utils;
-use utils::memory_pressure::MemoryPressure;
+//use utils::memory_pressure::MemoryPressure;
 use utils::prng::HeapRng;
-
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 struct Obj {
@@ -62,16 +61,16 @@ impl Distribution<Obj> for Standard {
 }
 
 trait Heap<T: Ord> {
-    fn push(&mut self,t: T);
+    fn push(&mut self, t: T);
     fn pop(&mut self) -> Option<T>;
     fn len(&self) -> usize;
     fn is_empty(&self) -> bool;
 }
 
-impl <T: Ord, C: Compare<T>> Heap<T> for BinaryHeap<T, C> {
+impl<T: Ord, C: Compare<T>> Heap<T> for BinaryHeap<T, C> {
     #[inline(always)]
-    fn push(&mut self,t: T) {
-        BinaryHeap::push(self,t);
+    fn push(&mut self, t: T) {
+        BinaryHeap::push(self, t);
     }
 
     #[inline(always)]
@@ -90,10 +89,10 @@ impl <T: Ord, C: Compare<T>> Heap<T> for BinaryHeap<T, C> {
     }
 }
 
-impl <T: Ord, C: Compare<T>, I: Indexer> Heap<T> for GHeap<T, C, I> {
+impl<T: Ord, C: Compare<T>, I: Indexer> Heap<T> for GHeap<T, C, I> {
     #[inline(always)]
-    fn push(&mut self,t: T) {
-        GHeap::push(self,t);
+    fn push(&mut self, t: T) {
+        GHeap::push(self, t);
     }
 
     #[inline(always)]
@@ -112,7 +111,6 @@ impl <T: Ord, C: Compare<T>, I: Indexer> Heap<T> for GHeap<T, C, I> {
     }
 }
 
-
 fn init_vec<T>(n: usize) -> Vec<T>
 where
     Standard: Distribution<T>,
@@ -122,21 +120,19 @@ where
     Standard.sample_iter(&mut rng).take(n).collect()
 }
 
-
 #[inline(always)]
 fn binary_heap_from_vec<T: Ord>(v: Vec<T>) -> BinaryHeap<T> {
     BinaryHeap::from_vec(v)
 }
 
 #[inline(always)]
-fn gheap_from_vec<T, I>(v: Vec<T>, i: I) -> GHeap<T, MaxComparator, I> 
-where 
-    T: Ord, 
-    I: Indexer 
+fn gheap_from_vec<T, I>(v: Vec<T>, i: I) -> GHeap<T, MaxComparator, I>
+where
+    T: Ord,
+    I: Indexer,
 {
     GHeap::from_vec_indexer(v, i)
 }
-
 
 fn heap_push<T: Ord, H: Heap<T>>(v: Vec<T>, mut heap: H) {
     for e in v {
@@ -144,14 +140,13 @@ fn heap_push<T: Ord, H: Heap<T>>(v: Vec<T>, mut heap: H) {
     }
 }
 
-fn heap_pop<T: Ord, H: Heap<T>>( mut heap: H) {
-    while ! heap.is_empty() {
+fn heap_pop<T: Ord, H: Heap<T>>(mut heap: H) {
+    while !heap.is_empty() {
         heap.pop();
     }
 }
 
 fn heap_push_pop<T: Ord, H: Heap<T>>(mut v: Vec<T>, mut heap: H) {
-
     //let mut heap = GHeap::with_capacity_indexer(v.len(), i);
 
     let vlen = v.len();
@@ -166,7 +161,7 @@ fn heap_push_pop<T: Ord, H: Heap<T>>(mut v: Vec<T>, mut heap: H) {
 
     loop {
         for _i in 0..push_iter.next().unwrap() {
-            if ! v.is_empty() {
+            if !v.is_empty() {
                 heap.push(v.pop().unwrap());
             } else {
                 break;
@@ -174,13 +169,13 @@ fn heap_push_pop<T: Ord, H: Heap<T>>(mut v: Vec<T>, mut heap: H) {
         }
 
         if v.is_empty() {
-            while ! heap.is_empty() {
+            while !heap.is_empty() {
                 heap.pop();
             }
             break;
         } else {
             for _i in 0..pop_iter.next().unwrap() {
-                if ! heap.is_empty() {
+                if !heap.is_empty() {
                     heap.pop();
                 } else {
                     break;
@@ -190,815 +185,216 @@ fn heap_push_pop<T: Ord, H: Heap<T>>(mut v: Vec<T>, mut heap: H) {
     }
 }
 
-macro_rules! def_group {
-    ( $GROUP:ident, $FUN_NAME:ident, $TYPE:ty, $SIZE:literal, $DATA:ident, $INDEXER:ident, $B_SETUP:tt , $B_LAMBDA:tt, $G_SETUP: tt, $G_LAMBDA:tt ) => {
+fn compute_size() -> usize {
+    50_000_000
+}
 
+macro_rules! gheap_bench_init {
+    ( $ID:ident, $FUN_NAME:ident, $TYPE:ty, $INDEXER:ident, $PARAM:ident, $FANOUT:literal, $PAGECHUNKS:literal )  => 
+    {
         paste::item! {
-
-            fn [< binary_heap _ $FUN_NAME _ $TYPE:snake _ $SIZE >] (c: &mut Criterion) {
-                let $DATA: Vec<$TYPE> = init_vec($SIZE);
-                c.bench_function(
-                    stringify!([< binary_heap _ $FUN_NAME _ $TYPE:snake _ $SIZE >]), 
-                    |b| {
-                        b.iter_batched( $B_SETUP, $B_LAMBDA, BatchSize::LargeInput );
-                    }
-                );
-            }
-
-            fn [< gheap _ $FUN_NAME _$TYPE:snake _ $SIZE _ "2_1" >](c: &mut Criterion) {
-
-                def_indexer!([< Indexer $FUN_NAME:camel "2_1" >], 2, 1);
-
-                let $INDEXER = [< Indexer $FUN_NAME:camel "2_1" >] {};
-                let $DATA: Vec<$TYPE> = init_vec($SIZE);
-                c.bench_function(
-                    stringify!([< gheap _ $FUN_NAME _$TYPE:snake _ $SIZE _ "2_1" >]),
-                    |b| {
-                        b.iter_batched( $G_SETUP, $G_LAMBDA, BatchSize::LargeInput);
-                    }
-                );
-            }
-       
-            fn [< gheap _ $FUN_NAME _$TYPE:snake _ $SIZE _ "2_2" >](c: &mut Criterion) {
-
-                def_indexer!([< Indexer $FUN_NAME:camel "2_2" >], 2, 2);
-
-                let $INDEXER = [< Indexer $FUN_NAME:camel "2_2" >] {};
-                let $DATA: Vec<$TYPE> = init_vec($SIZE);
-                c.bench_function(
-                    stringify!([< gheap _ $FUN_NAME _$TYPE:snake _ $SIZE _ "2_2" >]),
-                    |b| {
-                        b.iter_batched( $G_SETUP, $G_LAMBDA, BatchSize::LargeInput);
-                    }
-                );
-            }
-            
-            fn [< gheap _ $FUN_NAME _$TYPE:snake _ $SIZE _ "2_4" >](c: &mut Criterion) {
-
-                def_indexer!([< Indexer $FUN_NAME:camel "2_4" >], 2, 4);
-
-                let $INDEXER = [< Indexer $FUN_NAME:camel "2_4" >] {};
-                let $DATA: Vec<$TYPE> = init_vec($SIZE);
-                c.bench_function(
-                    stringify!([< gheap _ $FUN_NAME _$TYPE:snake _ $SIZE _ "2_4" >]),
-                    |b| {
-                        b.iter_batched( $G_SETUP, $G_LAMBDA, BatchSize::LargeInput);
-                    }
-                );
-            }
-
-            fn [< gheap _ $FUN_NAME _$TYPE:snake _ $SIZE _ "4_1" >](c: &mut Criterion) {
-
-                def_indexer!([< Indexer $FUN_NAME:camel "4_1" >], 4, 1);
-
-                let $INDEXER = [< Indexer $FUN_NAME:camel "4_1" >] {};
-                let $DATA: Vec<$TYPE> = init_vec($SIZE);
-                c.bench_function(
-                    stringify!([< gheap _ $FUN_NAME _$TYPE:snake _ $SIZE _ "4_1" >]),
-                    |b| {
-                        b.iter_batched( $G_SETUP, $G_LAMBDA, BatchSize::LargeInput);
-                    }
-                );
-            }
-
-            fn [< gheap _ $FUN_NAME _$TYPE:snake _ $SIZE _ "4_2" >](c: &mut Criterion) {
-
-                def_indexer!([< Indexer $FUN_NAME:camel "4_2" >], 4, 2);
-
-                let $INDEXER = [< Indexer $FUN_NAME:camel "4_2" >] {};
-                let $DATA: Vec<$TYPE> = init_vec($SIZE);
-                c.bench_function(
-                    stringify!([< gheap _ $FUN_NAME _$TYPE:snake _ $SIZE _ "4_2" >]),
-                    |b| {
-                        b.iter_batched( $G_SETUP, $G_LAMBDA, BatchSize::LargeInput);
-                    }
-                );
-            }
-
-            fn [< gheap _ $FUN_NAME _$TYPE:snake _ $SIZE _ "4_3" >](c: &mut Criterion) {
-
-                def_indexer!([< Indexer $FUN_NAME:camel "4_3" >], 4, 3);
-
-                let $INDEXER = [< Indexer $FUN_NAME:camel "4_3" >] {};
-                let $DATA: Vec<$TYPE> = init_vec($SIZE);
-                c.bench_function(
-                    stringify!([< gheap _ $FUN_NAME _$TYPE:snake _ $SIZE _ "4_3" >]),
-                    |b| {
-                        b.iter_batched( $G_SETUP, $G_LAMBDA, BatchSize::LargeInput);
-                    }
-                );
-            }
-
-            fn [< gheap _ $FUN_NAME _$TYPE:snake _ $SIZE _ "4_4" >](c: &mut Criterion) {
-
-                def_indexer!([< Indexer $FUN_NAME:camel "4_4" >], 4, 4);
-
-                let $INDEXER = [< Indexer $FUN_NAME:camel "4_4" >] {};
-                let $DATA: Vec<$TYPE> = init_vec($SIZE);
-                c.bench_function(
-                    stringify!([< gheap _ $FUN_NAME _$TYPE:snake _ $SIZE _ "4_4" >]),
-                    |b| {
-                        b.iter_batched( $G_SETUP, $G_LAMBDA, BatchSize::LargeInput);
-                    }
-                );
-            }
-
-        
-            fn [< gheap _ $FUN_NAME _$TYPE:snake _ $SIZE _ "4_8" >](c: &mut Criterion) {
-
-                def_indexer!([< Indexer $FUN_NAME:camel "4_8" >], 4, 8);
-
-                let $INDEXER = [< Indexer $FUN_NAME:camel "4_8" >] {};
-                let $DATA: Vec<$TYPE> = init_vec($SIZE);
-                c.bench_function(
-                    stringify!([< gheap _ $FUN_NAME _$TYPE:snake _ $SIZE _ "4_8" >]),
-                    |b| {
-                        b.iter_batched( $G_SETUP, $G_LAMBDA, BatchSize::LargeInput);
-                    }
-                );
-            }
-
-            fn [< gheap _ $FUN_NAME _ $TYPE:snake _ $SIZE _ "4_16" >](c: &mut Criterion) {
-
-                def_indexer!([< Indexer $FUN_NAME:camel "4_16" >], 4, 16);
-
-                let $INDEXER = [< Indexer $FUN_NAME:camel "4_16" >] {};
-                let $DATA: Vec<$TYPE> = init_vec($SIZE);
-                c.bench_function(
-                    stringify!([< gheap _ $FUN_NAME _ $TYPE:snake _ $SIZE _ "4_16" >]),
-                    |b| {
-                        b.iter_batched( $G_SETUP, $G_LAMBDA, BatchSize::LargeInput);
-                    }
-                );
-            }
- 
-            fn [< gheap _ $FUN_NAME _ $TYPE:snake _ $SIZE _ "4_32" >](c: &mut Criterion) {
-
-                def_indexer!([< Indexer $FUN_NAME:camel "4_32" >], 4, 32);
-
-                let $INDEXER = [< Indexer $FUN_NAME:camel "4_32" >] {};
-                let $DATA: Vec<$TYPE> = init_vec($SIZE);
-                c.bench_function(
-                    stringify!([< gheap _ $FUN_NAME _ $TYPE:snake _ $SIZE _ "4_32" >]),
-                    |b| {
-                        b.iter_batched( $G_SETUP, $G_LAMBDA, BatchSize::LargeInput);
-                    }
-                );
-            }
-
-            fn [< gheap _ $FUN_NAME _ $TYPE:snake _ $SIZE _ "4_64" >](c: &mut Criterion) {
-
-                def_indexer!([< Indexer $FUN_NAME:camel "4_64" >], 4, 64);
-
-                let $INDEXER = [< Indexer $FUN_NAME:camel "4_64" >] {};
-                let $DATA: Vec<$TYPE> = init_vec($SIZE);
-                c.bench_function(
-                    stringify!([< gheap _ $FUN_NAME _ $TYPE:snake _ $SIZE _ "4_64" >]),
-                    |b| {
-                        b.iter_batched( $G_SETUP, $G_LAMBDA, BatchSize::LargeInput);
-                    }
-                );
-            }
-
-            fn [< gheap _ $FUN_NAME _ $TYPE:snake _ $SIZE _ "4_128" >](c: &mut Criterion) {
-
-                def_indexer!([< Indexer $FUN_NAME:camel "4_128" >], 4, 128);
-
-                let $INDEXER = [< Indexer $FUN_NAME:camel "4_128" >] {};
-                let $DATA: Vec<$TYPE> = init_vec($SIZE);
-                c.bench_function(
-                    stringify!([< gheap _ $FUN_NAME _ $TYPE:snake _ $SIZE _ "4_128" >]),
-                    |b| {
-                        b.iter_batched( $G_SETUP, $G_LAMBDA, BatchSize::LargeInput);
-                    }
-                );
-            }
-
-            criterion_group!($GROUP, 
-                [< binary_heap _ $FUN_NAME _ $TYPE:snake _ $SIZE >],
-                [< gheap _ $FUN_NAME _ $TYPE:snake _ $SIZE _ "2_1">],
-                [< gheap _ $FUN_NAME _ $TYPE:snake _ $SIZE _ "2_2">],
-                [< gheap _ $FUN_NAME _ $TYPE:snake _ $SIZE _ "2_4">],
-                [< gheap _ $FUN_NAME _ $TYPE:snake _ $SIZE _ "4_1">],
-                [< gheap _ $FUN_NAME _ $TYPE:snake _ $SIZE _ "4_2">],
-                [< gheap _ $FUN_NAME _ $TYPE:snake _ $SIZE _ "4_3">],
-                [< gheap _ $FUN_NAME _ $TYPE:snake _ $SIZE _ "4_4">],
-                [< gheap _ $FUN_NAME _ $TYPE:snake _ $SIZE _ "4_8">],
-                [< gheap _ $FUN_NAME _ $TYPE:snake _ $SIZE _ "4_16">],
-                [< gheap _ $FUN_NAME _ $TYPE:snake _ $SIZE _ "4_32">],
-                [< gheap _ $FUN_NAME _ $TYPE:snake _ $SIZE _ "4_64">],
-                [< gheap _ $FUN_NAME _ $TYPE:snake _ $SIZE _ "4_128">],
-            );
+            //let $ID = format!("{}_{}_{}_{}", stringify!([< gheap _ $FUN_NAME:snake _ $TYPE:snake _ >]), $PARAM, $FANOUT, $PAGECHUNKS );
+            let $ID = stringify!([< gheap _ $FUN_NAME:snake _ $TYPE:snake _ $FANOUT _ $PAGECHUNKS>]);
+            def_indexer!([< Indexer $FUN_NAME:camel $FANOUT _ $PAGECHUNKS >], $FANOUT, $PAGECHUNKS);
+            let $INDEXER = [< Indexer $FUN_NAME:camel $FANOUT _ $PAGECHUNKS >] {};
         }
     }
 }
 
+const MEM_PRESSURE_SIZE: usize = 100_000_000;
+//const HEAP_SIZES: [usize; 7] = [100, 1_000, 10_000, 100_000, 1_000_000, 10_000_000, MEM_PRESSURE_SIZE];
+const HEAP_SIZES: [usize; 6] = [100, 1_000, 10_000, 100_000, 1_000_000, 10_000_000];
+
+macro_rules! def_group {
+    ( $GROUP:ident, $FUN_NAME:ident, $TYPE:ty, $DATA:ident, $INDEXER:ident, $B_SETUP:tt , $B_LAMBDA:tt, $G_SETUP: tt, $G_LAMBDA:tt ) => {
+
+        paste::item! {
+
+            fn [<  bench _ $FUN_NAME:snake _ $TYPE:snake >] (c: &mut Criterion) {
+
+                let mut group = c.benchmark_group(stringify!([< $GROUP >]));
+
+                for i in HEAP_SIZES.iter() {
+
+                    let mut size = *i;
+                    let param : String;
+                    if size == MEM_PRESSURE_SIZE {
+                        size = compute_size();
+                        param = String::from("pressure");
+                    } else {
+                        param = format!("{}", size);
+                    }
+
+                    let $DATA: Vec<$TYPE> = init_vec(size);
+
+                    //let id = format!("{}_{}", stringify!([< binary_heap _ $FUN_NAME:snake _ $TYPE:snake>]), param);
+                    let id = stringify!([< binary_heap _ $FUN_NAME:snake _ $TYPE:snake>]);
+                    group.bench_with_input(BenchmarkId::new(id, &param), &$DATA,
+                        |b, $DATA|  b.iter_batched( $B_SETUP, $B_LAMBDA, BatchSize::LargeInput));
 
 
-def_group!( group1, 
-    from_vec, 
-    usize, 
-    100, 
-    data, 
-    indexer, 
-    ( || data.clone()),
-    ( |v| binary_heap_from_vec(v)),
-    ( || data.clone()),
+                    gheap_bench_init!(id, $FUN_NAME, $TYPE, $INDEXER, param, 2, 1);
+                    group.bench_with_input(BenchmarkId::new(id, &param), &$DATA,
+                        |b, $DATA|  b.iter_batched( $G_SETUP, $G_LAMBDA, BatchSize::LargeInput));
+
+
+                    // Uncomment to check these typically unpromising examples
+                    // gheap_bench_init!(id, $FUN_NAME, $TYPE, $INDEXER, param, 2, 2);
+                    // group.bench_with_input(BenchmarkId::new(id, &param), &$DATA,
+                    //     |b, $DATA|  b.iter_batched( $G_SETUP, $G_LAMBDA, BatchSize::LargeInput));
+                        
+                    // gheap_bench_init!(id, $FUN_NAME, $TYPE, $INDEXER, param, 2, 4);
+                    // group.bench_with_input(BenchmarkId::new(id, &param), &$DATA,
+                    //     |b, $DATA|  b.iter_batched( $G_SETUP, $G_LAMBDA, BatchSize::LargeInput));
+                        
+
+                    gheap_bench_init!(id, $FUN_NAME, $TYPE, $INDEXER, param, 4, 1);
+                    group.bench_with_input(BenchmarkId::new(id, &param), &$DATA,
+                        |b, $DATA|  b.iter_batched( $G_SETUP, $G_LAMBDA, BatchSize::LargeInput));
+
+                    gheap_bench_init!(id, $FUN_NAME, $TYPE, $INDEXER, param, 4, 2);
+                    group.bench_with_input(BenchmarkId::new(id, &param), &$DATA,
+                        |b, $DATA|  b.iter_batched( $G_SETUP, $G_LAMBDA, BatchSize::LargeInput));
+
+                    // Uncomment to check
+                    // gheap_bench_init!(id, $FUN_NAME, $TYPE, $INDEXER, param, 4, 3);
+                    // group.bench_with_input(BenchmarkId::new(id, &param), &$DATA,
+                    //     |b, $DATA|  b.iter_batched( $G_SETUP, $G_LAMBDA, BatchSize::LargeInput));
+                            
+
+                    gheap_bench_init!(id, $FUN_NAME, $TYPE, $INDEXER, param, 4, 4);
+                    group.bench_with_input(BenchmarkId::new(id, &param), &$DATA,
+                        |b, $DATA|  b.iter_batched( $G_SETUP, $G_LAMBDA, BatchSize::LargeInput));
+
+                    gheap_bench_init!(id, $FUN_NAME, $TYPE, $INDEXER, param, 4, 8);
+                    group.bench_with_input(BenchmarkId::new(id, &param), &$DATA,
+                        |b, $DATA|  b.iter_batched( $G_SETUP, $G_LAMBDA, BatchSize::LargeInput));
+
+                    gheap_bench_init!(id, $FUN_NAME, $TYPE, $INDEXER, param, 4, 16);
+                    group.bench_with_input(BenchmarkId::new(id, &param), &$DATA,
+                        |b, $DATA|  b.iter_batched( $G_SETUP, $G_LAMBDA, BatchSize::LargeInput));
+
+                    gheap_bench_init!(id, $FUN_NAME, $TYPE, $INDEXER, param, 4, 32);
+                    group.bench_with_input(BenchmarkId::new(id, &param), &$DATA,
+                        |b, $DATA|  b.iter_batched( $G_SETUP, $G_LAMBDA, BatchSize::LargeInput));
+                            
+
+                    gheap_bench_init!(id, $FUN_NAME, $TYPE, $INDEXER, param, 4, 64);
+                    group.bench_with_input(BenchmarkId::new(id, &param), &$DATA,
+                        |b, $DATA|  b.iter_batched( $G_SETUP, $G_LAMBDA, BatchSize::LargeInput));
+
+                    gheap_bench_init!(id, $FUN_NAME, $TYPE, $INDEXER, param, 4, 128);
+                    group.bench_with_input(BenchmarkId::new(id, &param), &$DATA,
+                        |b, $DATA|  b.iter_batched( $G_SETUP, $G_LAMBDA, BatchSize::LargeInput));    
+    
+                    gheap_bench_init!(id, $FUN_NAME, $TYPE, $INDEXER, param, 8, 1);
+                    group.bench_with_input(BenchmarkId::new(id, &param), &$DATA,
+                        |b, $DATA|  b.iter_batched( $G_SETUP, $G_LAMBDA, BatchSize::LargeInput));
+
+                    gheap_bench_init!(id, $FUN_NAME, $TYPE, $INDEXER, param, 8, 2);
+                    group.bench_with_input(BenchmarkId::new(id, &param), &$DATA,
+                        |b, $DATA|  b.iter_batched( $G_SETUP, $G_LAMBDA, BatchSize::LargeInput));
+
+                    // Uncomment to check
+                    // gheap_bench_init!(id, $FUN_NAME, $TYPE, $INDEXER, param, 8, 3);
+                    // group.bench_with_input(BenchmarkId::new(id, &param), &$DATA,
+                    //     |b, $DATA|  b.iter_batched( $G_SETUP, $G_LAMBDA, BatchSize::LargeInput));
+                            
+
+                    gheap_bench_init!(id, $FUN_NAME, $TYPE, $INDEXER, param, 8, 4);
+                    group.bench_with_input(BenchmarkId::new(id, &param), &$DATA,
+                        |b, $DATA|  b.iter_batched( $G_SETUP, $G_LAMBDA, BatchSize::LargeInput));
+
+                    gheap_bench_init!(id, $FUN_NAME, $TYPE, $INDEXER, param, 8, 8);
+                    group.bench_with_input(BenchmarkId::new(id, &param), &$DATA,
+                        |b, $DATA|  b.iter_batched( $G_SETUP, $G_LAMBDA, BatchSize::LargeInput));
+
+                    gheap_bench_init!(id, $FUN_NAME, $TYPE, $INDEXER, param, 8, 16);
+                    group.bench_with_input(BenchmarkId::new(id, &param), &$DATA,
+                        |b, $DATA|  b.iter_batched( $G_SETUP, $G_LAMBDA, BatchSize::LargeInput));
+
+                    gheap_bench_init!(id, $FUN_NAME, $TYPE, $INDEXER, param, 8, 32);
+                    group.bench_with_input(BenchmarkId::new(id, &param), &$DATA,
+                        |b, $DATA|  b.iter_batched( $G_SETUP, $G_LAMBDA, BatchSize::LargeInput));
+                            
+
+                    gheap_bench_init!(id, $FUN_NAME, $TYPE, $INDEXER, param, 8, 64);
+                    group.bench_with_input(BenchmarkId::new(id, &param), &$DATA,
+                        |b, $DATA|  b.iter_batched( $G_SETUP, $G_LAMBDA, BatchSize::LargeInput));
+
+                    gheap_bench_init!(id, $FUN_NAME, $TYPE, $INDEXER, param, 8, 128);
+                    group.bench_with_input(BenchmarkId::new(id, &param), &$DATA,
+                        |b, $DATA|  b.iter_batched( $G_SETUP, $G_LAMBDA, BatchSize::LargeInput));
+                }
+                group.finish();
+            }
+
+            criterion_group!{
+                name = $GROUP; 
+                config = Criterion::default().significance_level(0.1).sample_size(100).measurement_time(Duration::from_secs(300));
+                targets = [<  bench _ $FUN_NAME:snake _ $TYPE:snake >]
+            }
+        }
+    }
+}
+
+def_group!( from_vec_usize, from_vec, usize, data, indexer,
+    (|| data.clone()),
+    (|v| binary_heap_from_vec(v)),
+    (|| data.clone()),
     (|v| gheap_from_vec(v, indexer))
 );
 
-def_group!( group2, 
-    from_vec, 
-    usize, 
-    1000, 
-    data, 
-    indexer, 
-    ( || data.clone()),
-    ( |v| binary_heap_from_vec(v)),
-    ( || data.clone()),
+def_group!( from_vec_obj, from_vec, Obj, data, indexer,
+    (|| data.clone()),
+    (|v| binary_heap_from_vec(v)),
+    (|| data.clone()),
     (|v| gheap_from_vec(v, indexer))
 );
 
-def_group!( group3, 
-    from_vec, 
-    usize, 
-    10000, 
-    data, 
-    indexer, 
-    ( || data.clone()),
-    ( |v| binary_heap_from_vec(v)),
-    ( || data.clone()),
-    (|v| gheap_from_vec(v, indexer))
+def_group!( push_usize, push, usize, data, indexer,
+    (|| {
+        let v = data.clone();
+        let h = BinaryHeap::<usize>::new();
+        (v, h)
+    }),
+    (|t| {
+        let (v, h) = t;
+        heap_push(v, h);
+    }),
+    (|| {
+        let v = data.clone();
+        let tv: Vec<usize> = vec![];
+        let h = gheap_from_vec(tv, indexer);
+        (v, h)
+    }),
+    (|t| {
+        let (v, h) = t;
+        heap_push(v, h);
+    })
 );
 
-def_group!( group4, 
-    from_vec, 
-    usize, 
-    100000, 
-    data, 
-    indexer, 
-    ( || data.clone()),
-    ( |v| binary_heap_from_vec(v)),
-    ( || data.clone()),
-    (|v| gheap_from_vec(v, indexer))
+def_group!( push_obj, push, Obj, data, indexer,
+    (|| {
+        let v = data.clone();
+        let h = BinaryHeap::<Obj>::new();
+        (v, h)
+    }),
+    (|t| {
+        let (v, h) = t;
+        heap_push(v, h);
+    }),
+    (|| {
+        let v = data.clone();
+        let tv: Vec<Obj> = vec![];
+        let h = gheap_from_vec(tv, indexer);
+        (v, h)
+    }),
+    (|t| {
+        let (v, h) = t;
+        heap_push(v, h);
+    })
 );
-
-def_group!( group5, 
-    from_vec, 
-    usize, 
-    1000000, 
-    data, 
-    indexer, 
-    ( || data.clone()),
-    ( |v| binary_heap_from_vec(v)),
-    ( || data.clone()),
-    (|v| gheap_from_vec(v, indexer))
-);
-
-def_group!( group6, 
-    from_vec, 
-    usize, 
-    10000000, 
-    data, 
-    indexer, 
-    ( || data.clone()),
-    ( |v| binary_heap_from_vec(v)),
-    ( || data.clone()),
-    (|v| gheap_from_vec(v, indexer))
-);
-
-def_group!( group7, 
-    from_vec, 
-    usize, 
-    100000000, 
-    data, 
-    indexer, 
-    ( || data.clone()),
-    ( |v| binary_heap_from_vec(v)),
-    ( || data.clone()),
-    (|v| gheap_from_vec(v, indexer))
-);
-
-def_group!( group8, 
-    from_vec, 
-    Obj, 
-    100, 
-    data, 
-    indexer, 
-    ( || data.clone()),
-    ( |v| binary_heap_from_vec(v)),
-    ( || data.clone()),
-    (|v| gheap_from_vec(v, indexer))
-);
-
-def_group!( group9, 
-    from_vec, 
-    Obj, 
-    1000, 
-    data, 
-    indexer, 
-    ( || data.clone()),
-    ( |v| binary_heap_from_vec(v)),
-    ( || data.clone()),
-    (|v| gheap_from_vec(v, indexer))
-);
-
-def_group!( group10, 
-    from_vec, 
-    Obj, 
-    10000, 
-    data, 
-    indexer, 
-    ( || data.clone()),
-    ( |v| binary_heap_from_vec(v)),
-    ( || data.clone()),
-    (|v| gheap_from_vec(v, indexer))
-);
-
-def_group!( group11, 
-    from_vec, 
-    Obj, 
-    100000, 
-    data, 
-    indexer, 
-    ( || data.clone()),
-    ( |v| binary_heap_from_vec(v)),
-    ( || data.clone()),
-    (|v| gheap_from_vec(v, indexer))
-);
-
-def_group!( group12, 
-    from_vec, 
-    Obj, 
-    1000000, 
-    data, 
-    indexer, 
-    ( || data.clone()),
-    ( |v| binary_heap_from_vec(v)),
-    ( || data.clone()),
-    (|v| gheap_from_vec(v, indexer))
-);
-
-def_group!( group13, 
-    from_vec, 
-    Obj, 
-    10000000, 
-    data, 
-    indexer, 
-    ( || data.clone()),
-    ( |v| binary_heap_from_vec(v)),
-    ( || data.clone()),
-    (|v| gheap_from_vec(v, indexer))
-);
-
-def_group!( group14, 
-    from_vec, 
-    Obj, 
-    100000000, 
-    data, 
-    indexer, 
-    ( || data.clone()),
-    ( |v| binary_heap_from_vec(v)),
-    ( || data.clone()),
-    (|v| gheap_from_vec(v, indexer))
-);
-
- 
-def_group!( group15, 
-    push, 
-    usize, 
-    100, 
-    data, 
-    indexer, 
-    (|| {
-            let v = data.clone();
-            let h = BinaryHeap::<usize>::new();
-            (v, h)
-        }
-    ),
-    ( |t| {
-            let (v, h) = t;
-            heap_push(v, h);
-        }
-    ),
-    (|| {
-            let v = data.clone();
-            let tv: Vec<usize> = vec![];
-            let h = gheap_from_vec(tv, indexer);
-            (v, h)
-        }
-    ),
-    ( |t| {
-            let (v, h) = t;
-            heap_push(v, h);
-        }
-    )
-);
-
-def_group!( group16, 
-    push, 
-    usize, 
-    1000, 
-    data, 
-    indexer, 
-    (|| {
-            let v = data.clone();
-            let h = BinaryHeap::<usize>::new();
-            (v, h)
-        }
-    ),
-    ( |t| {
-            let (v, h) = t;
-            heap_push(v, h);
-        }
-    ),
-    (|| {
-            let v = data.clone();
-            let tv: Vec<usize> = vec![];
-            let h = gheap_from_vec(tv, indexer);
-            (v, h)
-        }
-    ),
-    ( |t| {
-            let (v, h) = t;
-            heap_push(v, h);
-        }
-    )
-);
-
-def_group!( group17, 
-    push, 
-    usize, 
-    10000, 
-    data, 
-    indexer, 
-    (|| {
-            let v = data.clone();
-            let h = BinaryHeap::<usize>::new();
-            (v, h)
-        }
-    ),
-    ( |t| {
-            let (v, h) = t;
-            heap_push(v, h);
-        }
-    ),
-    (|| {
-            let v = data.clone();
-            let tv: Vec<usize> = vec![];
-            let h = gheap_from_vec(tv, indexer);
-            (v, h)
-        }
-    ),
-    ( |t| {
-            let (v, h) = t;
-            heap_push(v, h);
-        }
-    )
-);
-
-def_group!( group18, 
-    push, 
-    usize, 
-    100000, 
-    data, 
-    indexer, 
-    (|| {
-            let v = data.clone();
-            let h = BinaryHeap::<usize>::new();
-            (v, h)
-        }
-    ),
-    ( |t| {
-            let (v, h) = t;
-            heap_push(v, h);
-        }
-    ),
-    (|| {
-            let v = data.clone();
-            let tv: Vec<usize> = vec![];
-            let h = gheap_from_vec(tv, indexer);
-            (v, h)
-        }
-    ),
-    ( |t| {
-            let (v, h) = t;
-            heap_push(v, h);
-        }
-    )
-);
-
-def_group!( group19, 
-    push, 
-    usize, 
-    1000000, 
-    data, 
-    indexer, 
-    (|| {
-            let v = data.clone();
-            let h = BinaryHeap::<usize>::new();
-            (v, h)
-        }
-    ),
-    ( |t| {
-            let (v, h) = t;
-            heap_push(v, h);
-        }
-    ),
-    (|| {
-            let v = data.clone();
-            let tv: Vec<usize> = vec![];
-            let h = gheap_from_vec(tv, indexer);
-            (v, h)
-        }
-    ),
-    ( |t| {
-            let (v, h) = t;
-            heap_push(v, h);
-        }
-    )
-);
-
-def_group!( group20, 
-    push, 
-    usize, 
-    10000000, 
-    data, 
-    indexer, 
-    (|| {
-            let v = data.clone();
-            let h = BinaryHeap::<usize>::new();
-            (v, h)
-        }
-    ),
-    ( |t| {
-            let (v, h) = t;
-            heap_push(v, h);
-        }
-    ),
-    (|| {
-            let v = data.clone();
-            let tv: Vec<usize> = vec![];
-            let h = gheap_from_vec(tv, indexer);
-            (v, h)
-        }
-    ),
-    ( |t| {
-            let (v, h) = t;
-            heap_push(v, h);
-        }
-    )
-);
-
-def_group!( group21, 
-    push, 
-    usize, 
-    100000000, 
-    data, 
-    indexer, 
-    (|| {
-            let v = data.clone();
-            let h = BinaryHeap::<usize>::new();
-            (v, h)
-        }
-    ),
-    ( |t| {
-            let (v, h) = t;
-            heap_push(v, h);
-        }
-    ),
-    (|| {
-            let v = data.clone();
-            let tv: Vec<usize> = vec![];
-            let h = gheap_from_vec(tv, indexer);
-            (v, h)
-        }
-    ),
-    ( |t| {
-            let (v, h) = t;
-            heap_push(v, h);
-        }
-    )
-);
-
-def_group!( group22, 
-    push, 
-    Obj, 
-    100, 
-    data, 
-    indexer, 
-    (|| {
-            let v = data.clone();
-            let h = BinaryHeap::<Obj>::new();
-            (v, h)
-        }
-    ),
-    ( |t| {
-            let (v, h) = t;
-            heap_push(v, h);
-        }
-    ),
-    (|| {
-            let v = data.clone();
-            let tv: Vec<Obj> = vec![];
-            let h = gheap_from_vec(tv, indexer);
-            (v, h)
-        }
-    ),
-    ( |t| {
-            let (v, h) = t;
-            heap_push(v, h);
-        }
-    )
-);
-
-def_group!( group23, 
-    push, 
-    Obj, 
-    1000, 
-    data, 
-    indexer, 
-    (|| {
-            let v = data.clone();
-            let h = BinaryHeap::<Obj>::new();
-            (v, h)
-        }
-    ),
-    ( |t| {
-            let (v, h) = t;
-            heap_push(v, h);
-        }
-    ),
-    (|| {
-            let v = data.clone();
-            let tv: Vec<Obj> = vec![];
-            let h = gheap_from_vec(tv, indexer);
-            (v, h)
-        }
-    ),
-    ( |t| {
-            let (v, h) = t;
-            heap_push(v, h);
-        }
-    )
-);
-
-def_group!( group24, 
-    push, 
-    Obj, 
-    10000, 
-    data, 
-    indexer, 
-    (|| {
-            let v = data.clone();
-            let h = BinaryHeap::<Obj>::new();
-            (v, h)
-        }
-    ),
-    ( |t| {
-            let (v, h) = t;
-            heap_push(v, h);
-        }
-    ),
-    (|| {
-            let v = data.clone();
-            let tv: Vec<Obj> = vec![];
-            let h = gheap_from_vec(tv, indexer);
-            (v, h)
-        }
-    ),
-    ( |t| {
-            let (v, h) = t;
-            heap_push(v, h);
-        }
-    )
-);
-
-def_group!( group25, 
-    push, 
-    Obj, 
-    100000, 
-    data, 
-    indexer, 
-    (|| {
-            let v = data.clone();
-            let h = BinaryHeap::<Obj>::new();
-            (v, h)
-        }
-    ),
-    ( |t| {
-            let (v, h) = t;
-            heap_push(v, h);
-        }
-    ),
-    (|| {
-            let v = data.clone();
-            let tv: Vec<Obj> = vec![];
-            let h = gheap_from_vec(tv, indexer);
-            (v, h)
-        }
-    ),
-    ( |t| {
-            let (v, h) = t;
-            heap_push(v, h);
-        }
-    )
-);
-
-def_group!( group26, 
-    push, 
-    Obj, 
-    1000000, 
-    data, 
-    indexer, 
-    (|| {
-            let v = data.clone();
-            let h = BinaryHeap::<Obj>::new();
-            (v, h)
-        }
-    ),
-    ( |t| {
-            let (v, h) = t;
-            heap_push(v, h);
-        }
-    ),
-    (|| {
-            let v = data.clone();
-            let tv: Vec<Obj> = vec![];
-            let h = gheap_from_vec(tv, indexer);
-            (v, h)
-        }
-    ),
-    ( |t| {
-            let (v, h) = t;
-            heap_push(v, h);
-        }
-    )
-);
-
-def_group!( group27, 
-    push, 
-    Obj, 
-    10000000, 
-    data, 
-    indexer, 
-    (|| {
-            let v = data.clone();
-            let h = BinaryHeap::<Obj>::new();
-            (v, h)
-        }
-    ),
-    ( |t| {
-            let (v, h) = t;
-            heap_push(v, h);
-        }
-    ),
-    (|| {
-            let v = data.clone();
-            let tv: Vec<Obj> = vec![];
-            let h = gheap_from_vec(tv, indexer);
-            (v, h)
-        }
-    ),
-    ( |t| {
-            let (v, h) = t;
-            heap_push(v, h);
-        }
-    )
-);
-
-def_group!( group28, 
-    push, 
-    Obj, 
-    100000000, 
-    data, 
-    indexer, 
-    (|| {
-            let v = data.clone();
-            let h = BinaryHeap::<Obj>::new();
-            (v, h)
-        }
-    ),
-    ( |t| {
-            let (v, h) = t;
-            heap_push(v, h);
-        }
-    ),
-    (|| {
-            let v = data.clone();
-            let tv: Vec<Obj> = vec![];
-            let h = gheap_from_vec(tv, indexer);
-            (v, h)
-        }
-    ),
-    ( |t| {
-            let (v, h) = t;
-            heap_push(v, h);
-        }
-    )
-);
-
-
 
 
 // fn criterion_benchmark(c: &mut Criterion) {
@@ -1050,7 +446,7 @@ def_group!( group28,
 //         },
 //     );
 
-//     c.bench_function("BinaryHeap<usize>::from_vec usize 1000000", 
+//     c.bench_function("BinaryHeap<usize>::from_vec usize 1000000",
 //     |b| {
 //         b.iter_batched(
 //             setup_from_vec_usize,
@@ -1084,8 +480,8 @@ def_group!( group28,
 //                     );
 //                 },
 //             );
-        
-//             c.bench_function("MP BinaryHeap<usize>::from_vec Obj 1000000", 
+
+//             c.bench_function("MP BinaryHeap<usize>::from_vec Obj 1000000",
 //             |b| {
 //                 b.iter_batched(
 //                     setup_from_vec_obj,
@@ -1115,7 +511,7 @@ def_group!( group28,
 //                 },
 //             );
 
-//             c.bench_function("MP BinaryHeap<usize>::from_vec usize 1000000", 
+//             c.bench_function("MP BinaryHeap<usize>::from_vec usize 1000000",
 //             |b| {
 //                 b.iter_batched(
 //                     setup_from_vec_usize,
@@ -1136,8 +532,5 @@ def_group!( group28,
 //     };
 // }
 
-//criterion_group!(benches, criterion_benchmark);
-criterion_main!(group1, group2, group3, group4, group5, group6, group7,
-                group8, group9, group10, group11, group12, group13, group14,
-                group15, group16, group17, group18, group19, group20, group21,
-                group22, group23, group24, group25, group26, group27, group28) ;
+
+criterion_main!(from_vec_usize, from_vec_obj, push_usize, push_obj );
