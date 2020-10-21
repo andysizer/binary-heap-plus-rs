@@ -1,18 +1,15 @@
 #![allow(unused_parens)]
-#![feature(trace_macros)]
-
-trace_macros!(true);
+// #![feature(trace_macros)]
+// trace_macros!(true);
 
 use std::time::Duration;
 use std::cmp::Ordering;
-use std::ops::Sub;
 
 use compare::Compare;
 
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion, BenchmarkId};
 
 use rand::distributions::{Distribution, Standard, Uniform};
-
 use rand::Rng;
 
 use binary_heap_plus::BinaryHeap;
@@ -23,7 +20,7 @@ mod utils;
 //use utils::memory_pressure::MemoryPressure;
 use utils::prng::HeapRng;
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 struct Obj {
     w: i64,
     x: i64,
@@ -31,19 +28,9 @@ struct Obj {
     z: i64,
 }
 
-#[inline(always)]
-fn abs_diff<T: Sub<Output = T> + Ord>(l: T, r: T) -> T {
-    if l < r {
-        r - l
-    } else {
-        l - r
-    }
-}
 impl Ord for Obj {
     fn cmp(&self, other: &Self) -> Ordering {
-        let s = abs_diff(abs_diff(self.w, self.x), abs_diff(self.y, self.z));
-        let o = abs_diff(abs_diff(other.w, other.x), abs_diff(other.y, other.z));
-        s.cmp(&o)
+        self.w.cmp(&other.w)
     }
 }
 
@@ -185,6 +172,10 @@ fn heap_push_pop<T: Ord, H: Heap<T>>(mut v: Vec<T>, mut heap: H) {
     }
 }
 
+const MEM_PRESSURE_SIZE: usize = 100_000_000;
+const HEAP_SIZES: [usize; 7] = [100, 1_000, 10_000, 100_000, 1_000_000, 10_000_000, MEM_PRESSURE_SIZE];
+
+
 fn compute_size() -> usize {
     50_000_000
 }
@@ -201,9 +192,6 @@ macro_rules! gheap_bench_init {
     }
 }
 
-const MEM_PRESSURE_SIZE: usize = 100_000_000;
-//const HEAP_SIZES: [usize; 7] = [100, 1_000, 10_000, 100_000, 1_000_000, 10_000_000, MEM_PRESSURE_SIZE];
-const HEAP_SIZES: [usize; 6] = [100, 1_000, 10_000, 100_000, 1_000_000, 10_000_000];
 
 macro_rules! def_group {
     ( $GROUP:ident, $FUN_NAME:ident, $TYPE:ty, $DATA:ident, $INDEXER:ident, $B_SETUP:tt , $B_LAMBDA:tt, $G_SETUP: tt, $G_LAMBDA:tt ) => {
@@ -331,7 +319,7 @@ macro_rules! def_group {
 
             criterion_group!{
                 name = $GROUP; 
-                config = Criterion::default().significance_level(0.1).sample_size(100).measurement_time(Duration::from_secs(300));
+                config = Criterion::default().significance_level(0.1).sample_size(100).measurement_time(Duration::from_secs(10));
                 targets = [<  bench _ $FUN_NAME:snake _ $TYPE:snake >]
             }
         }
@@ -396,141 +384,85 @@ def_group!( push_obj, push, Obj, data, indexer,
     })
 );
 
+def_group!( pop_usize, pop, usize, data, indexer,
+    (|| { 
+        BinaryHeap::<usize>::from_vec(data.clone())
+    }),
+    (|h| {
+        heap_pop(h);
+    }),
+    (|| {
+        gheap_from_vec(data.clone(), indexer)
+    }),
+    (|h| {
+        heap_pop(h);
+    })
+);
 
-// fn criterion_benchmark(c: &mut Criterion) {
-//     let num_items: u64 = 3200000;
-//     let usize_vec: Vec<usize> = init_vec(num_items as usize);
-//     let obj_vec: Vec<Obj> = init_vec(num_items as usize);
+def_group!( pop_obj, pop, Obj, data, indexer,
+    (|| {
+        let v = data.clone();
+        let h = BinaryHeap::<Obj>::new();
+        (v, h)
+    }),
+    (|t| {
+        let (v, h) = t;
+        heap_push(v, h);
+    }),
+    (|| {
+        let v = data.clone();
+        let tv: Vec<Obj> = vec![];
+        let h = gheap_from_vec(tv, indexer);
+        (v, h)
+    }),
+    (|t| {
+        let (v, h) = t;
+        heap_push(v, h);
+    })
+);
 
-//     let setup_from_vec_usize = || usize_vec.clone();
-//     let setup_from_vec_obj = || obj_vec.clone();
+def_group!( push_pop_usize, push_pop, usize, data, indexer,
+    (|| {
+        let v = data.clone();
+        let h = BinaryHeap::<usize>::new();
+        (v, h)
+    }),
+    (|t| {
+        let (v, h) = t;
+        heap_push_pop(v, h);
+    }),
+    (|| {
+        let v = data.clone();
+        let tv: Vec<usize> = vec![];
+        let h = gheap_from_vec(tv, indexer);
+        (v, h)
+    }),
+    (|t| {
+        let (v, h) = t;
+        heap_push_pop(v, h);
+    })
+);
 
-//     c.bench_function(
-//         "GHeap<usize, MaxComparator, DefaultIndexer>::from_vec Obj 1000000",
-//         |b| {
-//             b.iter_batched(
-//                 setup_from_vec_obj,
-//                 |v| {
-//                     gheap_from_vec(v, DefaultIndexer{})
-//                 },
-//                 BatchSize::LargeInput,
-//             );
-//         },
-//     );
+def_group!( push_pop_obj, push_pop, Obj, data, indexer,
+    (|| {
+        let v = data.clone();
+        let h = BinaryHeap::<Obj>::new();
+        (v, h)
+    }),
+    (|t| {
+        let (v, h) = t;
+        heap_push(v, h);
+    }),
+    (|| {
+        let v = data.clone();
+        let tv: Vec<Obj> = vec![];
+        let h = gheap_from_vec(tv, indexer);
+        (v, h)
+    }),
+    (|t| {
+        let (v, h) = t;
+        heap_push(v, h);
+    })
+);
 
-//     c.bench_function("BinaryHeap<usize>::from_vec Obj 1000000", |b| {
-//         b.iter_batched(
-//             setup_from_vec_obj,
-//             |v| {
-//                 //bench_from_vec_1::<BinaryHeap<Obj, MaxComparator>, Obj>(v);
-//                 //let _h: BinaryHeap<Obj, MaxComparator> =  BinaryHeap::from_vec(v);
-//                 binary_heap_from_vec(v)
-//             },
-//             BatchSize::LargeInput,
-//         );
-//     });
-
-//     c.bench_function(
-//         "GHeap<usize, MaxComparator, DefaultIndexer>::from_vec usize 1000000",
-//         |b| {
-//             b.iter_batched(
-//                 setup_from_vec_usize,
-//                 |v| {
-//                     bench_from_vec::<GHeap<usize, MaxComparator, DefaultIndexer>, usize>(
-//                         &GHeap::from_vec,
-//                         v,
-//                     );
-//                 },
-//                 BatchSize::LargeInput,
-//             );
-//         },
-//     );
-
-//     c.bench_function("BinaryHeap<usize>::from_vec usize 1000000",
-//     |b| {
-//         b.iter_batched(
-//             setup_from_vec_usize,
-//             |v| {
-//                 bench_from_vec::<BinaryHeap<usize, MaxComparator>, usize>(
-//                     &binary_heap_plus::BinaryHeap::from_vec,
-//                     v,
-//                 );
-//             },
-//             BatchSize::LargeInput,
-//         );
-//     });
-
-//     let memory_pressure = MemoryPressure::new(num_items);
-
-//     match memory_pressure {
-//         Some(_) => {
-
-//             c.bench_function(
-//                 "MP GHeap<usize, MaxComparator, DefaultIndexer>::from_vec Obj 1000000",
-//                 |b| {
-//                     b.iter_batched(
-//                         setup_from_vec_obj,
-//                         |v| {
-//                             bench_from_vec::<GHeap<Obj, MaxComparator, DefaultIndexer>, Obj>(
-//                                 &GHeap::from_vec,
-//                                 v,
-//                             );
-//                         },
-//                         BatchSize::LargeInput,
-//                     );
-//                 },
-//             );
-
-//             c.bench_function("MP BinaryHeap<usize>::from_vec Obj 1000000",
-//             |b| {
-//                 b.iter_batched(
-//                     setup_from_vec_obj,
-//                     |v| {
-//                         bench_from_vec::<BinaryHeap<Obj, MaxComparator>, Obj>(
-//                             &binary_heap_plus::BinaryHeap::from_vec,
-//                             v,
-//                         );
-//                     },
-//                     BatchSize::LargeInput,
-//                 );
-//             });
-
-//             c.bench_function(
-//                 "MP GHeap<usize, MaxComparator, DefaultIndexer>::from_vec usize 1000000",
-//                 |b| {
-//                     b.iter_batched(
-//                         setup_from_vec_usize,
-//                         |v| {
-//                             bench_from_vec::<GHeap<usize, MaxComparator, DefaultIndexer>, usize>(
-//                                 &GHeap::from_vec,
-//                                 v,
-//                             );
-//                         },
-//                         BatchSize::LargeInput,
-//                     );
-//                 },
-//             );
-
-//             c.bench_function("MP BinaryHeap<usize>::from_vec usize 1000000",
-//             |b| {
-//                 b.iter_batched(
-//                     setup_from_vec_usize,
-//                     |v| {
-//                         bench_from_vec::<BinaryHeap<usize, MaxComparator>, usize>(
-//                             &binary_heap_plus::BinaryHeap::from_vec,
-//                             v,
-//                         );
-//                     },
-//                     BatchSize::LargeInput,
-//                 );
-//             });
-
-//         }
-//         None => {
-//             eprintln!("Couldn't set up memeory pressure.");
-//         }
-//     };
-// }
-
-
-criterion_main!(from_vec_usize, from_vec_obj, push_usize, push_obj );
+criterion_main!(from_vec_usize, from_vec_obj, push_usize, push_obj, pop_usize, pop_obj, push_pop_usize, push_pop_obj );
