@@ -1,3 +1,8 @@
+// Abortive attempt to create 'memory pressure' against which to run the benchmarks.
+// Too sensitive to 'external' conditions i.e. the state of the OS, including e.g 'swapiness'.
+// Makes reproducibility and interpretation of benchmark results even more difficult.
+// Keep the code, though, just in case....
+
 use nix::sys::signal::Signal::*;
 use nix::sys::wait::WaitStatus::*;
 use nix::sys::wait::{waitpid, WaitPidFlag};
