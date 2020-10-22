@@ -9,8 +9,9 @@ use compare::Compare;
 
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion, BenchmarkId};
 
-use rand::distributions::{Distribution, Standard, Uniform};
+use rand::distributions::{Distribution, Standard};
 use rand::Rng;
+use rand_distr::{ChiSquared};
 
 use binary_heap_plus::BinaryHeap;
 
@@ -119,57 +120,6 @@ where
     I: Indexer,
 {
     GHeap::from_vec_indexer(v, i)
-}
-
-fn heap_push<T: Ord, H: Heap<T>>(v: Vec<T>, mut heap: H) {
-    for e in v {
-        heap.push(e);
-    }
-}
-
-fn heap_pop<T: Ord, H: Heap<T>>(mut heap: H) {
-    while !heap.is_empty() {
-        heap.pop();
-    }
-}
-
-fn heap_push_pop<T: Ord, H: Heap<T>>(mut v: Vec<T>, mut heap: H) {
-    //let mut heap = GHeap::with_capacity_indexer(v.len(), i);
-
-    let vlen = v.len();
-
-    let push_rng: HeapRng = HeapRng::new();
-    let push_range = Uniform::new_inclusive(1, vlen / 2);
-    let mut push_iter = push_range.sample_iter(push_rng);
-
-    let pop_rng: HeapRng = HeapRng::new();
-    let pop_range = Uniform::new_inclusive(1, (vlen / 2) - (vlen / 10));
-    let mut pop_iter = pop_range.sample_iter(pop_rng);
-
-    loop {
-        for _i in 0..push_iter.next().unwrap() {
-            if !v.is_empty() {
-                heap.push(v.pop().unwrap());
-            } else {
-                break;
-            }
-        }
-
-        if v.is_empty() {
-            while !heap.is_empty() {
-                heap.pop();
-            }
-            break;
-        } else {
-            for _i in 0..pop_iter.next().unwrap() {
-                if !heap.is_empty() {
-                    heap.pop();
-                } else {
-                    break;
-                }
-            }
-        }
-    }
 }
 
 const MEM_PRESSURE_SIZE: usize = 100_000_000;
@@ -326,6 +276,57 @@ macro_rules! def_group {
     }
 }
 
+// push the contents of the Vec v onto/into(?) heap
+fn heap_push<T: Ord, H: Heap<T>>(v: Vec<T>, mut heap: H) {
+    for e in v {
+        heap.push(e);
+    }
+}
+
+// pop n items from heap
+fn heap_pop<T: Ord, H: Heap<T>>(mut n: usize, mut heap: H) {
+    while n > 0 {
+        heap.pop();
+        n = n -1;
+    }
+}
+
+// While Vec is not empty, push a (pseudo) random number (sampled from a ChiSquared distribution) 
+// of items into/onto heap then pop a similarly selceted (psuedo) random number of items from heap.
+// This is intended to approximate a plausible pattern of use. 
+fn heap_push_pop<T: Ord, H: Heap<T>>(mut v: Vec<T>, mut heap: H) {
+
+    // 'Empirically' k=1.80 seems to give a reasonable 'shape'
+    let chi = ChiSquared::new(1.80).unwrap();
+    let rng = HeapRng::new();
+    
+    let mut sample_iter = rng.sample_iter(chi);
+
+    loop {
+        let end = sample_iter.next().unwrap() as usize + 1;
+        for _i in 0..end {
+            if !v.is_empty() {
+                heap.push(v.pop().unwrap());
+            } else {
+                break;
+            }
+        }
+
+        if v.is_empty() {
+            break;
+        } else {
+            let end = sample_iter.next().unwrap() as usize + 1;
+            for _i in 0..end {
+                if !heap.is_empty() {
+                    heap.pop();
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+}
+
 def_group!( from_vec_usize, from_vec, usize, data, indexer,
     (|| data.clone()),
     (|v| binary_heap_from_vec(v)),
@@ -342,19 +343,24 @@ def_group!( from_vec_obj, from_vec, Obj, data, indexer,
 
 def_group!( push_usize, push, usize, data, indexer,
     (|| {
-        let v = data.clone();
-        let h = BinaryHeap::<usize>::new();
-        (v, h)
+        let size = data.len();
+        let ten_pc = size / 10;
+        let heap_vec = data[.. 9 * ten_pc].to_vec();
+        let push_vec = data[9 * ten_pc ..].to_vec();
+        let heap = binary_heap_from_vec(heap_vec);
+        (push_vec, heap)
     }),
     (|t| {
         let (v, h) = t;
         heap_push(v, h);
     }),
     (|| {
-        let v = data.clone();
-        let tv: Vec<usize> = vec![];
-        let h = gheap_from_vec(tv, indexer);
-        (v, h)
+        let size = data.len();
+        let ten_pc = size / 10;
+        let heap_vec = data[.. 9 * ten_pc].to_vec();
+        let push_vec = data[9 * ten_pc ..].to_vec();
+        let heap = gheap_from_vec(heap_vec, indexer);
+        (push_vec, heap)
     }),
     (|t| {
         let (v, h) = t;
@@ -364,19 +370,24 @@ def_group!( push_usize, push, usize, data, indexer,
 
 def_group!( push_obj, push, Obj, data, indexer,
     (|| {
-        let v = data.clone();
-        let h = BinaryHeap::<Obj>::new();
-        (v, h)
+        let size = data.len();
+        let ten_pc = size / 10;
+        let heap_vec = data[.. 9 * ten_pc].to_vec();
+        let push_vec = data[9 * ten_pc ..].to_vec();
+        let heap = binary_heap_from_vec(heap_vec);
+        (push_vec, heap)
     }),
     (|t| {
         let (v, h) = t;
         heap_push(v, h);
     }),
     (|| {
-        let v = data.clone();
-        let tv: Vec<Obj> = vec![];
-        let h = gheap_from_vec(tv, indexer);
-        (v, h)
+        let size = data.len();
+        let ten_pc = size / 10;
+        let heap_vec = data[.. 9 * ten_pc].to_vec();
+        let push_vec = data[9 * ten_pc ..].to_vec();
+        let heap = gheap_from_vec(heap_vec, indexer);
+        (push_vec, heap)
     }),
     (|t| {
         let (v, h) = t;
@@ -386,56 +397,60 @@ def_group!( push_obj, push, Obj, data, indexer,
 
 def_group!( pop_usize, pop, usize, data, indexer,
     (|| { 
-        BinaryHeap::<usize>::from_vec(data.clone())
+        ( data.len() / 10 , binary_heap_from_vec(data.clone()))
     }),
-    (|h| {
-        heap_pop(h);
+    (|t| {
+        let (n, h) = t;
+
+        heap_pop(n, h);
     }),
     (|| {
-        gheap_from_vec(data.clone(), indexer)
+        ( data.len() / 10 , gheap_from_vec(data.clone(), indexer) )
     }),
-    (|h| {
-        heap_pop(h);
+    (|t| {
+        let (n, h) = t;
+        heap_pop(n, h);
     })
 );
 
 def_group!( pop_obj, pop, Obj, data, indexer,
-    (|| {
-        let v = data.clone();
-        let h = BinaryHeap::<Obj>::new();
-        (v, h)
+    (|| { 
+        ( data.len() / 10 , binary_heap_from_vec(data.clone()))
     }),
     (|t| {
-        let (v, h) = t;
-        heap_push(v, h);
+        let (n, h) = t;
+
+        heap_pop(n, h);
     }),
     (|| {
-        let v = data.clone();
-        let tv: Vec<Obj> = vec![];
-        let h = gheap_from_vec(tv, indexer);
-        (v, h)
+        ( data.len() / 10 , gheap_from_vec(data.clone(), indexer) )
     }),
     (|t| {
-        let (v, h) = t;
-        heap_push(v, h);
+        let (n, h) = t;
+        heap_pop(n, h);
     })
 );
 
 def_group!( push_pop_usize, push_pop, usize, data, indexer,
     (|| {
-        let v = data.clone();
-        let h = BinaryHeap::<usize>::new();
-        (v, h)
+        let size = data.len();
+        let ten_pc = size / 10;
+        let heap_vec = data[.. 9 * ten_pc].to_vec();
+        let push_vec = data[9 * ten_pc ..].to_vec();
+        let heap = binary_heap_from_vec(heap_vec);
+        (push_vec, heap)
     }),
     (|t| {
         let (v, h) = t;
         heap_push_pop(v, h);
     }),
     (|| {
-        let v = data.clone();
-        let tv: Vec<usize> = vec![];
-        let h = gheap_from_vec(tv, indexer);
-        (v, h)
+        let size = data.len();
+        let ten_pc = size / 10;
+        let heap_vec = data[.. 9 * ten_pc].to_vec();
+        let push_vec = data[9 * ten_pc ..].to_vec();
+        let heap = gheap_from_vec(heap_vec, indexer);
+        (push_vec, heap)
     }),
     (|t| {
         let (v, h) = t;
@@ -445,23 +460,28 @@ def_group!( push_pop_usize, push_pop, usize, data, indexer,
 
 def_group!( push_pop_obj, push_pop, Obj, data, indexer,
     (|| {
-        let v = data.clone();
-        let h = BinaryHeap::<Obj>::new();
-        (v, h)
+        let size = data.len();
+        let ten_pc = size / 10;
+        let heap_vec = data[.. 9 * ten_pc].to_vec();
+        let push_vec = data[9 * ten_pc ..].to_vec();
+        let heap = binary_heap_from_vec(heap_vec);
+        (push_vec, heap)
     }),
     (|t| {
         let (v, h) = t;
-        heap_push(v, h);
+        heap_push_pop(v, h);
     }),
     (|| {
-        let v = data.clone();
-        let tv: Vec<Obj> = vec![];
-        let h = gheap_from_vec(tv, indexer);
-        (v, h)
+        let size = data.len();
+        let ten_pc = size / 10;
+        let heap_vec = data[.. 9 * ten_pc].to_vec();
+        let push_vec = data[9 * ten_pc ..].to_vec();
+        let heap = gheap_from_vec(heap_vec, indexer);
+        (push_vec, heap)
     }),
     (|t| {
         let (v, h) = t;
-        heap_push(v, h);
+        heap_push_pop(v, h);
     })
 );
 

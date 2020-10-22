@@ -16,6 +16,7 @@ serde = { version = "1.0.116", optional = true, features = ["derive"] }
 [dev-dependencies]
 serde_json = "1.0.57"
 rand = "0.7"
+rand_distr = "0.3"
 rand_core = "0.5"
 paste = "1.0"
 stdext = "0.2"
