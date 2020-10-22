@@ -14,7 +14,7 @@ fn passed() {
     println!("ok");
 }
 
-fn test_parent_child<I: Indexer>(idxer: &I, idx_type: &str, start_index: usize, n: usize) {
+fn test_parent_child<I: HeapIndexer>(idxer: &I, idx_type: &str, start_index: usize, n: usize) {
     assert!(start_index > 0);
     assert!(start_index <= std::usize::MAX - n);
 
@@ -44,7 +44,7 @@ fn test_parent_child<I: Indexer>(idxer: &I, idx_type: &str, start_index: usize, 
     passed();
 }
 
-fn test_is_heap<I: Indexer + Copy>(idxer: &I, idx_type: &str, n: usize) {
+fn test_is_heap<I: HeapIndexer + Copy>(idxer: &I, idx_type: &str, n: usize) {
     assert!(n > 0);
 
     print!("    {}<{}>(n={}) ... ", function_name!(), idx_type, n);
@@ -79,7 +79,7 @@ fn init_array(n: usize) -> Vec<usize> {
     dist.sample_iter(&mut rng).take(n).collect()
 }
 
-fn test_make_heap<I: Indexer + Copy + Default>(idxer: &I, idx_type: &str, n: usize) {
+fn test_make_heap<I: HeapIndexer + Copy + Default>(idxer: &I, idx_type: &str, n: usize) {
     print!("    {}<{}>(n={}) ... ", function_name!(), idx_type, n);
 
     let v = init_array(n);
@@ -104,7 +104,7 @@ fn assert_sorted_desc(v: Vec<usize>) {
     }
 }
 
-fn test_sort_heap<I: Indexer + Copy + Default>(idxer: &I, idx_type: &str, n: usize) {
+fn test_sort_heap<I: HeapIndexer + Copy + Default>(idxer: &I, idx_type: &str, n: usize) {
     print!("    {}<{}>(n={}) ... ", function_name!(), idx_type, n);
 
     let v = init_array(n);
@@ -121,7 +121,7 @@ fn test_sort_heap<I: Indexer + Copy + Default>(idxer: &I, idx_type: &str, n: usi
     passed();
 }
 
-fn test_push_heap<I: Indexer + Copy + Default>(idxer: &I, idx_type: &str, n: usize) {
+fn test_push_heap<I: HeapIndexer + Copy + Default>(idxer: &I, idx_type: &str, n: usize) {
     print!("    {}<{}>(n={}) ... ", function_name!(), idx_type, n);
 
     let v = init_array(n);
@@ -134,7 +134,7 @@ fn test_push_heap<I: Indexer + Copy + Default>(idxer: &I, idx_type: &str, n: usi
 
     passed();
 }
-fn test_pop_heap<I: Indexer + Copy + Default>(idxer: &I, idx_type: &str, n: usize) {
+fn test_pop_heap<I: HeapIndexer + Copy + Default>(idxer: &I, idx_type: &str, n: usize) {
     print!("    {}<{}>(n={}) ... ", function_name!(), idx_type, n);
 
     let v = init_array(n);
@@ -155,7 +155,7 @@ fn test_pop_heap<I: Indexer + Copy + Default>(idxer: &I, idx_type: &str, n: usiz
     passed();
 }
 
-fn test_func<I: Indexer>(idxer: &I, idx_type: &str, func: fn(&I, idx_type: &str, usize)) {
+fn test_func<I: HeapIndexer>(idxer: &I, idx_type: &str, func: fn(&I, idx_type: &str, usize)) {
     for i in 1..12 {
         func(idxer, idx_type, i);
     }
@@ -177,7 +177,7 @@ macro_rules! test_all {
         }
     };
 }
-fn test_all<I: Indexer + Copy + Default + std::panic::RefUnwindSafe>(idx: &I, idx_type: &str) {
+fn test_all<I: HeapIndexer + Copy + Default + std::panic::RefUnwindSafe>(idx: &I, idx_type: &str) {
     let result = panic::catch_unwind(|| {
         let n = 1000000;
         test_parent_child(idx, idx_type, 1, n);
