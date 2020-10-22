@@ -25,7 +25,7 @@ nix = "0.19"
 sysinfo = "0.15"
 page_size = "0.4"
 
-[dependencies.binary-heap-plus]
+[dev-dependencies.binary-heap-plus]
 path = "../binary-heap-plus-rs"
 
 [[bench]]
