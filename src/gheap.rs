@@ -196,7 +196,7 @@ use std::vec;
 /// use gheap::*;
 ///
 /// // Type inference lets us omit an explicit type signature (which
-/// // would be `GHeap<i32, MaxComparator>` in this example).
+/// // would be `GHeap<i32, MaxComparator, Indexer>` in this example).
 /// let mut heap = GHeap::new();
 ///
 /// // We can use peek to look at the next item in the heap. In this case,
@@ -235,10 +235,10 @@ use std::vec;
 
 // #[stable(feature = "rust1", since = "1.0.0")]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct GHeap<T, C = MaxComparator, I = DefaultIndexer>
+pub struct GHeap<T, C = MaxComparator, I = Indexer>
 where
     C: Compare<T>,
-    I: Indexer,
+    I: HeapIndexer,
 {
     data: Vec<T>,
     cmp: C,
@@ -297,7 +297,7 @@ where
     }
 }
 
-pub trait Indexer {
+pub trait HeapIndexer {
     fn get_fanout(&self) -> usize;
 
     fn get_page_chunks(&self) -> usize;
@@ -405,7 +405,7 @@ macro_rules! def_indexer {
             #[derive(Clone, Copy, Default, Debug)]
             pub struct $s {}
 
-            impl Indexer for $s {
+            impl HeapIndexer for $s {
                 #[inline(always)]
                 fn get_fanout(&self) -> usize { $f }
 
@@ -420,9 +420,9 @@ macro_rules! def_indexer {
 /// The default indexer for GHeap has a fanout of 4 and uses 2 page chunks.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, Default, Debug)]
-pub struct DefaultIndexer {}
+pub struct Indexer {}
 
-impl Indexer for DefaultIndexer {
+impl HeapIndexer for Indexer {
     #[inline(always)]
     fn get_fanout(&self) -> usize {
         4
@@ -446,21 +446,21 @@ pub struct PeekMut<'a, T, C, I>
 where
     T: 'a,
     C: 'a + Compare<T>,
-    I: Indexer,
+    I: HeapIndexer,
 {
     heap: &'a mut GHeap<T, C, I>,
     sift: bool,
 }
 
 // #[stable(feature = "collection_debug", since = "1.17.0")]
-impl<'a, T: fmt::Debug, C: Compare<T>, I: Indexer> fmt::Debug for PeekMut<'a, T, C, I> {
+impl<'a, T: fmt::Debug, C: Compare<T>, I: HeapIndexer> fmt::Debug for PeekMut<'a, T, C, I> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_tuple("PeekMut").field(&self.heap.data[0]).finish()
     }
 }
 
 // #[stable(feature = "binary_heap_peek_mut", since = "1.12.0")]
-impl<'a, T, C: Compare<T>, I: Indexer> Drop for PeekMut<'a, T, C, I> {
+impl<'a, T, C: Compare<T>, I: HeapIndexer> Drop for PeekMut<'a, T, C, I> {
     fn drop(&mut self) {
         if self.sift {
             self.heap.sift_down(0);
@@ -469,7 +469,7 @@ impl<'a, T, C: Compare<T>, I: Indexer> Drop for PeekMut<'a, T, C, I> {
 }
 
 // #[stable(feature = "binary_heap_peek_mut", since = "1.12.0")]
-impl<'a, T, C: Compare<T>, I: Indexer> Deref for PeekMut<'a, T, C, I> {
+impl<'a, T, C: Compare<T>, I: HeapIndexer> Deref for PeekMut<'a, T, C, I> {
     type Target = T;
     fn deref(&self) -> &T {
         &self.heap.data[0]
@@ -477,13 +477,13 @@ impl<'a, T, C: Compare<T>, I: Indexer> Deref for PeekMut<'a, T, C, I> {
 }
 
 // #[stable(feature = "binary_heap_peek_mut", since = "1.12.0")]
-impl<'a, T, C: Compare<T>, I: Indexer> DerefMut for PeekMut<'a, T, C, I> {
+impl<'a, T, C: Compare<T>, I: HeapIndexer> DerefMut for PeekMut<'a, T, C, I> {
     fn deref_mut(&mut self) -> &mut T {
         &mut self.heap.data[0]
     }
 }
 
-impl<'a, T, C: Compare<T>, I: Indexer> PeekMut<'a, T, C, I> {
+impl<'a, T, C: Compare<T>, I: HeapIndexer> PeekMut<'a, T, C, I> {
     /// Removes the peeked value from the heap and returns it.
     // #[stable(feature = "binary_heap_peek_mut_pop", since = "1.18.0")]
     pub fn pop(mut this: PeekMut<'a, T, C, I>) -> T {
@@ -494,7 +494,7 @@ impl<'a, T, C: Compare<T>, I: Indexer> PeekMut<'a, T, C, I> {
 }
 
 // #[stable(feature = "rust1", since = "1.0.0")]
-impl<T: Clone, C: Compare<T> + Clone, I: Indexer + Clone> Clone for GHeap<T, C, I> {
+impl<T: Clone, C: Compare<T> + Clone, I: HeapIndexer + Clone> Clone for GHeap<T, C, I> {
     fn clone(&self) -> Self {
         GHeap {
             data: self.data.clone(),
@@ -518,13 +518,13 @@ impl<T: Ord> Default for GHeap<T> {
 }
 
 // #[stable(feature = "GHeap_debug", since = "1.4.0")]
-impl<T: fmt::Debug, C: Compare<T>, I: Indexer> fmt::Debug for GHeap<T, C, I> {
+impl<T: fmt::Debug, C: Compare<T>, I: HeapIndexer> fmt::Debug for GHeap<T, C, I> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_list().entries(self.iter()).finish()
     }
 }
 
-impl<T, C: Compare<T> + Default> GHeap<T, C, DefaultIndexer> {
+impl<T, C: Compare<T> + Default> GHeap<T, C, Indexer> {
     /// Generic constructor for `GHeap` from `Vec`.
     ///
     /// Because `GHeap` stores the elements in its internal `Vec`,
@@ -534,26 +534,26 @@ impl<T, C: Compare<T> + Default> GHeap<T, C, DefaultIndexer> {
     }
 }
 
-impl<T, C: Compare<T>> GHeap<T, C, DefaultIndexer> {
+impl<T, C: Compare<T>> GHeap<T, C, Indexer> {
     /// Generic constructor for `GHeap` from `Vec` and comparator.
     ///
     /// Because `GHeap` stores the elements in its internal `Vec`,
     /// it's natural to construct it from `Vec`.
     pub fn from_vec_cmp(vec: Vec<T>, cmp: C) -> Self {
-        GHeap::from_vec_cmp_indexer(vec, cmp, DefaultIndexer {})
+        GHeap::from_vec_cmp_indexer(vec, cmp, Indexer {})
     }
 }
 
-impl<T: Ord, C: Compare<T> + Default, I: Indexer> GHeap<T, C, I> {
+impl<T: Ord, I: HeapIndexer> GHeap<T, MaxComparator, I> {
     /// Constructs a `GHeap` from `vec` and `indexer`. Defaults to a max heap.
     ///
     /// Takes ownership of `vec` and `indexer`.
     pub fn from_vec_indexer(vec: Vec<T>, indexer: I) -> Self {
-        GHeap::from_vec_cmp_indexer(vec, C::default(), indexer)
+        GHeap::from_vec_cmp_indexer(vec, MaxComparator::default(), indexer)
     }
 }
 
-impl<T: Ord, I: Indexer> GHeap<T, MinComparator, I> {
+impl<T: Ord, I: HeapIndexer> GHeap<T, MinComparator, I> {
     /// Constructs a min `GHeap` from `vec` and `indexer`.
     ///
     /// Takes ownership of `vec` and `indexer`.
@@ -564,7 +564,7 @@ impl<T: Ord, I: Indexer> GHeap<T, MinComparator, I> {
     }
 }
 
-impl<T, C: Compare<T>, I: Indexer> GHeap<T, C, I> {
+impl<T, C: Compare<T>, I: HeapIndexer> GHeap<T, C, I> {
     /// Constructs a `GHeap` from `vec`, `cmp` and `indexer`.
     ///
     /// Takes ownership of `vec`, `cmp` and `indexer`.
@@ -594,7 +594,7 @@ impl<T, C: Compare<T>, I: Indexer> GHeap<T, C, I> {
 }
 
 impl<T: Ord> GHeap<T> {
-    /// Constructs an empty max `GHeap` that uses the `DefaultIndexer`
+    /// Constructs an empty max `GHeap` that uses the default `HeapIndexer` (i.e. `Indexer`)
     pub fn new() -> Self {
         GHeap::from_vec(vec![])
     }
@@ -605,7 +605,7 @@ impl<T: Ord> GHeap<T> {
     }
 }
 
-impl<T: Ord, I: Indexer> GHeap<T, MaxComparator, I> {
+impl<T: Ord, I: HeapIndexer> GHeap<T, MaxComparator, I> {
     /// Creates an empty max heap with a custom indexer
     pub fn new_indexer(idxer: I) -> Self {
         GHeap::from_vec_indexer(vec![], idxer)
@@ -663,7 +663,7 @@ impl<T: Ord> GHeap<T, MinComparator> {
     }
 }
 
-impl<T: Ord, I: Indexer> GHeap<T, MinComparator, I> {
+impl<T: Ord, I: HeapIndexer> GHeap<T, MinComparator, I> {
     /// Creates an empty `GHeap`.
     ///
     /// The `_min_indexer()` version will create a min-heap with a supplied indexer.
@@ -674,7 +674,7 @@ impl<T: Ord, I: Indexer> GHeap<T, MinComparator, I> {
     ///
     /// ```
     /// use gheap::*;
-    /// let mut heap = GHeap::new_min_indexer(DefaultIndexer{});
+    /// let mut heap = GHeap::new_min_indexer(Indexer{});
     /// heap.push(3);
     /// heap.push(1);
     /// heap.push(5);
@@ -697,7 +697,7 @@ impl<T: Ord, I: Indexer> GHeap<T, MinComparator, I> {
     ///
     /// ```
     /// use gheap::*;
-    /// let mut heap = GHeap::with_capacity_min_indexer(10, DefaultIndexer{});
+    /// let mut heap = GHeap::with_capacity_min_indexer(10, Indexer{});
     /// assert_eq!(heap.capacity(), 10);
     /// heap.push(3);
     /// heap.push(1);
@@ -761,7 +761,7 @@ where
 impl<T, F, I> GHeap<T, FnComparator<F>, I>
 where
     F: Fn(&T, &T) -> Ordering,
-    I: Indexer,
+    I: HeapIndexer,
 {
     /// Creates an empty `GHeap` that uses the supplied indexer.
     ///
@@ -773,7 +773,7 @@ where
     ///
     /// ```
     /// use gheap::*;
-    /// let mut heap = GHeap::new_by_indexer(|a: &i32, b: &i32| b.cmp(a), DefaultIndexer{});
+    /// let mut heap = GHeap::new_by_indexer(|a: &i32, b: &i32| b.cmp(a), Indexer{});
     /// heap.push(3);
     /// heap.push(1);
     /// heap.push(5);
@@ -796,7 +796,7 @@ where
     ///
     /// ```
     /// use gheap::*;
-    /// let mut heap = GHeap::with_capacity_by_indexer(10, |a: &i32, b: &i32| b.cmp(a), DefaultIndexer{});
+    /// let mut heap = GHeap::with_capacity_by_indexer(10, |a: &i32, b: &i32| b.cmp(a), Indexer{});
     /// assert_eq!(heap.capacity(), 10);
     /// heap.push(3);
     /// heap.push(1);
@@ -860,7 +860,7 @@ where
 impl<T, F, K: Ord, I> GHeap<T, KeyComparator<F>, I>
 where
     F: Fn(&T) -> K,
-    I: Indexer,
+    I: HeapIndexer,
 {
     /// Creates an empty `GHeap`.
     ///
@@ -873,7 +873,7 @@ where
     ///
     /// ```
     /// use gheap::*;
-    /// let mut heap = GHeap::new_by_key_indexer(|a: &i32| a % 4, DefaultIndexer{});
+    /// let mut heap = GHeap::new_by_key_indexer(|a: &i32| a % 4, Indexer{});
     /// heap.push(3);
     /// heap.push(1);
     /// heap.push(5);
@@ -897,7 +897,7 @@ where
     ///
     /// ```
     /// use gheap::*;
-    /// let mut heap = GHeap::with_capacity_by_key_indexer(10, |a: &i32| a % 4, DefaultIndexer{});
+    /// let mut heap = GHeap::with_capacity_by_key_indexer(10, |a: &i32| a % 4, Indexer{});
     /// assert_eq!(heap.capacity(), 10);
     /// heap.push(3);
     /// heap.push(1);
@@ -909,7 +909,7 @@ where
     }
 }
 
-impl<T, C: Compare<T>, I: Indexer> GHeap<T, C, I> {
+impl<T, C: Compare<T>, I: HeapIndexer> GHeap<T, C, I> {
     /// Replaces the comparator of binary heap.
     ///
     /// # Examples
@@ -1504,7 +1504,7 @@ impl<T, C: Compare<T>, I: Indexer> GHeap<T, C, I> {
     }
 }
 
-impl<T, C: Compare<T> + Default, I: Indexer + Default> GHeap<T, C, I> {}
+impl<T, C: Compare<T> + Default, I: HeapIndexer + Default> GHeap<T, C, I> {}
 
 /// Hole represents a hole in a slice i.e. an index without valid value
 /// (because it was moved from or duplicated).
@@ -1718,12 +1718,12 @@ impl<T> DoubleEndedIterator for IntoIter<T> {
 
 // #[unstable(feature = "binary_heap_into_iter_sorted", issue = "59278")]
 #[derive(Clone, Debug)]
-pub struct IntoIterSorted<T, C: Compare<T>, I: Indexer> {
+pub struct IntoIterSorted<T, C: Compare<T>, I: HeapIndexer> {
     inner: GHeap<T, C, I>,
 }
 
 // #[unstable(feature = "binary_heap_into_iter_sorted", issue = "59278")]
-impl<T, C: Compare<T>, I: Indexer> Iterator for IntoIterSorted<T, C, I> {
+impl<T, C: Compare<T>, I: HeapIndexer> Iterator for IntoIterSorted<T, C, I> {
     type Item = T;
 
     #[inline]
@@ -1799,7 +1799,7 @@ impl<T: Ord> From<Vec<T>> for GHeap<T> {
 //     }
 // }
 
-impl<T, C: Compare<T>, I: Indexer> Into<Vec<T>> for GHeap<T, C, I> {
+impl<T, C: Compare<T>, I: HeapIndexer> Into<Vec<T>> for GHeap<T, C, I> {
     fn into(self) -> Vec<T> {
         self.data
     }
@@ -1853,7 +1853,7 @@ impl<'a, T, C: Compare<T>> IntoIterator for &'a GHeap<T, C> {
 }
 
 // #[stable(feature = "rust1", since = "1.0.0")]
-impl<T, C: Compare<T>, G: Indexer> Extend<T> for GHeap<T, C, G> {
+impl<T, C: Compare<T>, G: HeapIndexer> Extend<T> for GHeap<T, C, G> {
     #[inline]
     fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
         // <Self as SpecExtend<I>>::spec_extend(self, iter);
@@ -1873,7 +1873,7 @@ impl<T, C: Compare<T>, G: Indexer> Extend<T> for GHeap<T, C, G> {
 //     }
 // }
 
-impl<T, C: Compare<T>, G: Indexer> GHeap<T, C, G> {
+impl<T, C: Compare<T>, G: HeapIndexer> GHeap<T, C, G> {
     fn extend_desugared<I: IntoIterator<Item = T>>(&mut self, iter: I) {
         let iterator = iter.into_iter();
         let (lower, _) = iterator.size_hint();
@@ -1887,7 +1887,7 @@ impl<T, C: Compare<T>, G: Indexer> GHeap<T, C, G> {
 }
 
 // #[stable(feature = "extend_ref", since = "1.2.0")]
-impl<'a, T: 'a + Copy, C: Compare<T>, G: Indexer> Extend<&'a T> for GHeap<T, C, G> {
+impl<'a, T: 'a + Copy, C: Compare<T>, G: HeapIndexer> Extend<&'a T> for GHeap<T, C, G> {
     fn extend<I: IntoIterator<Item = &'a T>>(&mut self, iter: I) {
         self.extend(iter.into_iter().cloned());
     }
