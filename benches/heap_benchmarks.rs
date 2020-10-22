@@ -77,7 +77,7 @@ impl<T: Ord, C: Compare<T>> Heap<T> for BinaryHeap<T, C> {
     }
 }
 
-impl<T: Ord, C: Compare<T>, I: Indexer> Heap<T> for GHeap<T, C, I> {
+impl<T: Ord, C: Compare<T>, I: HeapIndexer> Heap<T> for GHeap<T, C, I> {
     #[inline(always)]
     fn push(&mut self, t: T) {
         GHeap::push(self, t);
@@ -117,7 +117,7 @@ fn binary_heap_from_vec<T: Ord>(v: Vec<T>) -> BinaryHeap<T> {
 fn gheap_from_vec<T, I>(v: Vec<T>, i: I) -> GHeap<T, MaxComparator, I>
 where
     T: Ord,
-    I: Indexer,
+    I: HeapIndexer,
 {
     GHeap::from_vec_indexer(v, i)
 }
