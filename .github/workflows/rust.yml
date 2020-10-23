@@ -16,7 +16,7 @@ jobs:
         - macos-latest
         rust:
         - stable
-        - 1.31.1 # MSRV (Rust 2018)
+        - 1.47.0 #1.31.1 # MSRV (Rust 2018)
         cargo_args:
         - ""
         - --features serde
