@@ -6,6 +6,9 @@ use rand::thread_rng;
 
 use stdext::function_name;
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 use gheap::*;
 
 #[cfg(test)]
