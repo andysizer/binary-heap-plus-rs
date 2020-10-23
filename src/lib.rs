@@ -1,11 +1,11 @@
-//! This crate provides `GHeap` which implements a n-ary heap in which subtrees containing k items are laid out contiguously 
-//! in a 'chunk'. `GHeap` can be used to implement a [Priority Queue](https://www.wikiwand.com/en/Priority_queue#:~:text=In%20computer%20science%2C%20a%20priority,an%20element%20with%20low%20priority.)
+//! This crate provides `GHeap` which implements a d-ary heap in which subtrees containing k items are laid out contiguously 
+//! in a 'pagechunk'. `GHeap` can be used to implement a [Priority Queue](https://www.wikiwand.com/en/Priority_queue#:~:text=In%20computer%20science%2C%20a%20priority,an%20element%20with%20low%20priority.)
 //! in a similar fashion to `std::collections::BinaryHeap`.
 //! 
 //! This implementation was motivated by the article ['You're Doing It Wrong'](https://queue.acm.org/detail.cfm?id=1814327) which
 //! introduces the [B-heap](https://www.wikiwand.com/en/B-heap). The main idea is that laying out subtrees contiguously will tend to increase
-//! locality when the heap is traversed using the parent-child relation and that he benefits of increased locality will tend to outweigh
-//! the increased cost of computing the parent-child relation when memory is under pressure due to the cost of paging.
+//! locality when the heap is traversed using the parent-child relation and that, due to the cost of paging, the benefits of increased locality will tend to outweigh
+//! the increased cost of computing the parent-child relation when memory is under pressure.
 //! 
 //! The `benches` directory contains benchmarks to test this idea. These appear to show that most of the time any improvement shown by `GHeap` over 
 //! `BinaryHeap` is due to 'fanout' (n-ariness) rather than chunking. However there appear to be 'sweet spots' where a judicious choice of fanout and
@@ -89,6 +89,8 @@
 //! `GHeap::from_vec_indexer()` constructs a heap with a custom indexer.
 //!
 //! ```rust
+//!     #[cfg(feature = "serde")]
+//!     use serde::{Deserialize, Serialize};
 //!     use gheap::*;
 //!
 //!     // define ThreeTwoIndexer to be a HeapIndexer that uses a fanout of 3 and pagechunk size of 2.
@@ -109,7 +111,9 @@
 //! * `GHeap::from_vec_indexer(vec, indexer)`
 //! * `GHeap::from_vec_cmp_indexer(vec, cmp, indexer)`
 //!
-//! ```
+//! ```rust
+//! #[cfg(feature = "serde")]
+//! use serde::{Deserialize, Serialize};
 //! use gheap::*;
 //!
 //! // max heap (default)
