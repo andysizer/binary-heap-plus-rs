@@ -89,8 +89,6 @@
 //! `GHeap::from_vec_indexer()` constructs a heap with a custom indexer.
 //!
 //! ```rust
-//!     #[cfg(feature = "serde")]
-//!     use serde::{Deserialize, Serialize};
 //!     use gheap::*;
 //!
 //!     // define ThreeTwoIndexer to be a HeapIndexer that uses a fanout of 3 and pagechunk size of 2.
@@ -112,8 +110,7 @@
 //! * `GHeap::from_vec_cmp_indexer(vec, cmp, indexer)`
 //!
 //! ```rust
-//! #[cfg(feature = "serde")]
-//! use serde::{Deserialize, Serialize};
+//! 
 //! use gheap::*;
 //!
 //! // max heap (default)
